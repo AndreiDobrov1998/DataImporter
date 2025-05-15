@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/scripts/generate-orders.js",
-    "dev": "ts-node src/scripts/generate-orders.ts",
+    "orders-create": "ts-node src/scripts/generate-orders.ts",
     "import-catalog": "ts-node src/scripts/import-catalog.ts",
     "delete-catalog": "ts-node src/scripts/delete-catalog.ts",
     "manage-taxes": "ts-node src/scripts/manage-taxes.ts",

@@ -39,7 +39,7 @@ AUTH_TOKEN=your_square_access_token
 
 ### Generate Orders
 ```bash
-npm run dev
+npm run orders-create
 ```
 
 ### Import Catalog
@@ -68,7 +68,7 @@ npm run manage-taxes delete
 
 - `npm run build` - Build the project
 - `npm run start` - Run the built project
-- `npm run dev` - Run the project in development mode
+- `npm run orders-create` - Run the project in development mode
 
 ## License
 
