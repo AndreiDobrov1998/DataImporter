@@ -70,6 +70,30 @@ npm run manage-taxes delete
 - `npm run start` - Run the built project
 - `npm run orders-create` - Run the project in development mode
 
+## Order Data Generator
+
+The `order-data-generator.ts` script generates orders for all catalog items using the Square API. It uses the `SquareManager` class to interact with the Square API.
+
+### Usage
+
+To run the order data generator, use the following command:
+
+```bash
+npx ts-node src/scripts/order-data-generator.ts
+```
+
+### Features
+
+- Fetches all catalog items and generates orders for each item.
+- Uses random quantities (1-3) for each order.
+- Applies taxes if available.
+- Includes a delay between orders to avoid rate limiting.
+
+### Prerequisites
+
+- Ensure you have the necessary environment variables set up in your `.env` file.
+- Make sure you have the required dependencies installed by running `npm install`.
+
 ## License
 
 [Your License] 
