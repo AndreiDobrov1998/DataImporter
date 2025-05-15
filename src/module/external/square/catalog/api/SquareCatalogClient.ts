@@ -24,6 +24,7 @@ interface IItemObject {
     categoryId: string;
     quantity: number;
     modifierId?: string;
+    variations: IItemVariationObject[];
 }
 
 interface IItemVariationObject {
@@ -271,32 +272,39 @@ export class SquareManager extends SquareBaseClient {
         return result;
     }
 
-    generateItemObjects(item: IItemObject, variations: IItemVariationObject): CatalogObject[] {
-        const itemId = this.generateId();
-        const variationObjects = this.generateItemVariations(variations);
-        const itemObjects: CatalogObject[] = [
-            {
+    public generateItemObjects(items: IItemObject[]): any[] {
+        return items.map(item => {
+            const itemId = this.generateId();
+            const variationId = this.generateId();
+            return {
                 type: 'ITEM',
                 id: itemId,
-                itemData: {
+                item_data: {
                     name: item.name,
-                    categoryId: item.categoryId,
-                    variations: variationObjects.map((variation) => ({
-                        type: 'ITEM_VARIATION',
-                        id: variation.id,
-                        itemVariationData: variation.itemVariationData,
-                    })),
-                    modifierListInfo: item.modifierId
+                    category_id: item.categoryId,
+                    variations: [
+                        {
+                            type: 'ITEM_VARIATION',
+                            id: variationId,
+                            item_variation_data: {
+                                name: 'Default',
+                                pricing_type: 'FIXED_PRICING',
+                                price_money: {
+                                    amount: item.variations[0]?.price ?? 100,
+                                    currency: 'USD'
+                                }
+                            }
+                        }
+                    ],
+                    modifier_list_info: item.modifierId
                         ? [{
-                            modifierListId: item.modifierId,
+                            modifier_list_id: item.modifierId,
                             enabled: true
                         }]
-                        : undefined,
-                },
-            },
-            ...variationObjects
-        ];
-        return itemObjects;
+                        : undefined
+                }
+            };
+        });
     }
 
     private generateCategoryObjects(categoryName: string = 'test', quantity: number = 1): CatalogObject[] {
@@ -333,18 +341,18 @@ export class SquareManager extends SquareBaseClient {
         ];
     }
 
-    private generateItemVariations(variation: IItemVariationObject): CatalogObject[] {
-        return Array.from({ length: variation.quantity }, () => ({
+    private generateItemVariations(variations: IItemVariationObject[]): any[] {
+        return variations.map(variation => ({
             type: 'ITEM_VARIATION',
             id: this.generateId(),
-            itemVariationData: {
-                name: `Variation ${this.generateId()}`,
-                pricingType: 'FIXED_PRICING',
-                priceMoney: {
-                    amount: BigInt(variation.price),
-                    currency: 'USD',
-                },
-            },
+            item_variation_data: {
+                name: `Variation #${this.generateIdempotencyKey()}`,
+                pricing_type: 'FIXED_PRICING',
+                price_money: {
+                    amount: variation.price,
+                    currency: 'USD'
+                }
+            }
         }));
     }
 
