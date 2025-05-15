@@ -1,0 +1,141 @@
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Blocked by Cloudflare Gateway</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      @import url("https://fonts.googleapis.com/css?family=Roboto&display=swap");
+
+      body {
+        margin: 0;
+        padding: 0;
+        background: #000000;
+        font-family: "Roboto", sans-serif;
+        color: #ffffff;
+      }
+
+      a:link {
+        color: inherit;
+        background-color: transparent;
+        text-decoration: underline;
+      }
+
+      a:hover {
+        text-decoration: underline;
+      }
+
+      #container {
+        min-height: 100vh;
+        display: grid;
+        justify-items: center;
+        align-items: stretch;
+        grid-template-columns: 1fr;
+        grid-template-rows: max-content auto max-content;
+        box-sizing: border-box;
+        padding: 0 20px;
+      }
+
+      header {
+        text-align: center;
+        margin-top: 10vh;
+      }
+
+      main {
+        text-align: center;
+      }
+
+      .org-name {
+        margin: 20px 0 0 0;
+        font-style: normal;
+        font-weight: bold;
+        font-size: 22px;
+      }
+
+      .title {
+        margin: 48px 0 0 0;
+        font-style: normal;
+        font-weight: bold;
+        font-size: 46px;
+        line-height: 54px;
+        text-align: center;
+      }
+
+      .site {
+        margin: 24px 0 0 0;
+        font-style: normal;
+        font-weight: bold;
+        font-size: 18px;
+        line-height: 21px;
+      }
+
+      .subtitle {
+        max-width: 600px;
+        margin: 10px 0 0 0;
+        text-align: center;
+        font-style: normal;
+        font-weight: bold;
+        font-size: 18px;
+        line-height: 21px;
+        flex-grow: 1;
+      }
+      
+      .mt-6 {
+        margin: 24px 0 0 0;
+      }
+
+      .mt-3 {
+        margin: 12px 0 0 0;
+      }
+
+      .block-reason {
+        font-size: 16px;
+      }
+
+      .mailto-address {
+        font-size: 16px;
+      }
+
+      .radar {
+        font-size: 16px;
+      }
+
+      footer {
+        font-style: normal;
+        font-size: 14px;
+        line-height: 16px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        opacity: 0.8;
+        padding: 20px 0;
+      }
+    </style>
+  <body>
+    <div id="container">
+      <header>
+        <img src="https:&#x2F;&#x2F;cdn.block.xyz&#x2F;logo&#x2F;png&#x2F;block_400.png" width="146" height="146" aria-hidden="true"></img>
+        <div class="org-name">Block, Inc.</div>
+        <h1 class="title">This page presents a risk to Block</h1>
+      </header>
+      <main>
+        <div class="site" id="domain">Site: registry.npmjs.org</div>
+        <div class="subtitle">
+          <div class="footer-text">The website you are trying to access has been blocked because it presents a risk to the safety and security of Block’s IT systems. If you believe that this site has been blocked in error, please open a ticket with Corporate Security at go&#x2F;ask-corpsec.</div>
+          <div class="mt-6"></div>
+          <div class="block-reason">This has been blocked as part of the Dependency Confusion threat. Please see go&#x2F;dependencyconfusionpypi and go&#x2F;dependencyconfusionnpm for more info.</div>
+          <div class="mt-6"></div>
+          
+        </div>
+      </main>
+      <footer>
+        <div class="radar">Look up this site on <a href="https://radar.cloudflare.com/domain/registry.npmjs.org">Cloudflare Radar</a> for more information.</div>
+        <div class="mt-3"></div>
+        <div>Rule ID: bc67885e-59df-4da1-925a-ed0387772fa2 • Source IP: 104.30.133.104 • Location: cf1ebd1203624140846ced63a200519e </div>
+        <div>Account ID: 1e25787f854fa4b713d08a859d3e16ed • User ID: c8058b31-2c7a-574a-88aa-22aa3e5b160c • Device ID: f3f6621a-d726-11ef-8424-bab0197888d4</div>
+      </footer>
+    </div>
+  </body>
+</html>
+

@@ -1,0 +1,27 @@
+{
+  "name": "square-order-generator",
+  "version": "1.0.0",
+  "description": "A standalone tool for generating Square orders",
+  "main": "dist/scripts/generate-orders.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/scripts/generate-orders.js",
+    "dev": "ts-node src/scripts/generate-orders.ts",
+    "import-catalog": "ts-node src/scripts/import-catalog.ts",
+    "delete-catalog": "ts-node src/scripts/delete-catalog.ts",
+    "manage-taxes": "ts-node src/scripts/manage-taxes.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "square": "npm:@goparrot/square@37.1.0-alpha.2024-07-17-patch-0",
+    "uuid": "^9.0.0",
+    "@faker-js/faker": "^8.4.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.24",
+    "@types/uuid": "^10.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}
