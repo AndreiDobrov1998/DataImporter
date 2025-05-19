@@ -64,6 +64,18 @@ npm run manage-taxes list
 npm run manage-taxes delete
 ```
 
+### Manage Locations
+```bash
+# Create locations
+npx ts-node src/scripts/create-locations.ts [number_of_locations]
+
+# Delete specific number of locations
+npx ts-node src/scripts/delete-locations.ts [number_of_locations]
+
+# Delete all locations
+npx ts-node src/scripts/delete-all-locations.ts
+```
+
 ## Development
 
 - `npm run build` - Build the project
