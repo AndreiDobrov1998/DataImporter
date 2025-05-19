@@ -33,6 +33,18 @@ const argv = yargs(hideBin(process.argv))
         description: 'Number of items per category',
         default: 10
     })
+    .option('modifier-groups', {
+        alias: 'g',
+        type: 'number',
+        description: 'Number of modifier groups to create',
+        default: 3
+    })
+    .option('modifiers-per-group', {
+        alias: 'm',
+        type: 'number',
+        description: 'Number of modifiers per group',
+        default: 5
+    })
     .help()
     .argv as any;
 
@@ -47,45 +59,52 @@ async function importCatalog() {
             id: `#Category${i + 1}`,
             presentAtAllLocations: true,
             categoryData: {
-                name: faker.commerce.department()
+                name: `Category SQ-${String(i + 1).padStart(2, '0')}`
             }
         }));
 
-        const modifiers = Array.from({ length: 5 }, (_, i) => ({
-            type: 'MODIFIER',
-            id: `#Modifier${i + 1}`,
-            presentAtAllLocations: true,
-            modifierData: {
-                name: faker.commerce.productAdjective(),
-                priceMoney: {
-                    amount: BigInt(faker.number.int({ min: 100, max: 1000 })),
-                    currency: 'USD'
+        // Generate multiple modifier groups
+        const modifierGroups = Array.from({ length: argv['modifier-groups'] }, (_, groupIndex) => {
+            const modifiers = Array.from({ length: argv['modifiers-per-group'] }, (_, i) => ({
+                type: 'MODIFIER',
+                id: `#Modifier${groupIndex * argv['modifiers-per-group'] + i + 1}`,
+                presentAtAllLocations: true,
+                modifierData: {
+                    name: `Modifier SQ-${String(groupIndex + 1).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`,
+                    priceMoney: {
+                        amount: BigInt(faker.number.int({ min: 100, max: 1000 })),
+                        currency: 'USD'
+                    }
                 }
-            }
-        }));
+            }));
 
-        const modifierList = {
-            type: 'MODIFIER_LIST',
-            id: '#ModifierList1',
-            presentAtAllLocations: true,
-            modifierListData: {
-                name: 'Modifiers',
-                modifiers: modifiers
-            }
-        };
+            return {
+                type: 'MODIFIER_LIST',
+                id: `#ModifierList${groupIndex + 1}`,
+                presentAtAllLocations: true,
+                modifierListData: {
+                    name: `Modifier SQ-${String(groupIndex + 1).padStart(2, '0')}`,
+                    modifiers: modifiers
+                }
+            };
+        });
 
-        // First batch: categories and modifier list
-        console.log('Importing categories and modifier list...');
-        const firstBatch = [...categories, modifierList];
+        // First batch: categories and modifier lists
+        console.log('Importing categories and modifier lists...');
+        const firstBatch = [...categories, ...modifierGroups];
         const firstBatchResponse = await catalogClient.batchUpsertItemObjects([{ objects: firstBatch }]);
-        console.log('Categories and modifier list imported successfully!');
+        console.log('Categories and modifier lists imported successfully!');
 
-        // Extract the real Square object ID for the modifier list
-        let realModifierListId = '#ModifierList1';
+        // Extract the real Square object IDs for the modifier lists
+        const modifierListIdMap: Record<string, string> = {};
         if (firstBatchResponse.idMappings) {
-            const mapping = firstBatchResponse.idMappings.find(m => m.clientObjectId === '#ModifierList1');
-            if (mapping && mapping.objectId) {
-                realModifierListId = mapping.objectId;
+            for (const group of modifierGroups) {
+                const mapping = firstBatchResponse.idMappings.find(m => m.clientObjectId === group.id);
+                if (mapping && mapping.objectId) {
+                    modifierListIdMap[group.id] = mapping.objectId;
+                } else {
+                    modifierListIdMap[group.id] = group.id; // fallback
+                }
             }
         }
 
@@ -105,18 +124,23 @@ async function importCatalog() {
         // Generate all items
         const itemsPerCategory = argv.items;
         const allItems: CatalogObject[] = [];
+        let globalItemCounter = 1;
         
         for (let categoryIndex = 0; categoryIndex < categories.length; categoryIndex++) {
             const clientCategoryId = `#Category${categoryIndex + 1}`;
             const realCategoryId = categoryIdMap[clientCategoryId] || clientCategoryId;
             for (let itemIndex = 0; itemIndex < itemsPerCategory; itemIndex++) {
-                const itemNumber = categoryIndex * itemsPerCategory + itemIndex + 1;
+                // Assign a random modifier list to each item
+                const randomModifierListIndex = Math.floor(Math.random() * modifierGroups.length);
+                const clientModifierListId = `#ModifierList${randomModifierListIndex + 1}`;
+                const realModifierListId = modifierListIdMap[clientModifierListId] || clientModifierListId;
+
                 allItems.push({
                     type: 'ITEM',
-                    id: `#Item${itemNumber}`,
+                    id: `#Item${globalItemCounter}`,
                     presentAtAllLocations: true,
                     itemData: {
-                        name: faker.commerce.productName(),
+                        name: `Item SQ-${String(globalItemCounter).padStart(4, '0')}`,
                         categories: [{ id: realCategoryId }],
                         modifierListInfo: [{
                             modifierListId: realModifierListId,
@@ -124,10 +148,10 @@ async function importCatalog() {
                         }],
                         variations: [{
                             type: 'ITEM_VARIATION',
-                            id: `#Variation${itemNumber}`,
+                            id: `#Variation${globalItemCounter}`,
                             presentAtAllLocations: true,
                             itemVariationData: {
-                                itemId: `#Item${itemNumber}`,
+                                itemId: `#Item${globalItemCounter}`,
                                 name: 'Default',
                                 pricingType: 'FIXED_PRICING',
                                 priceMoney: {
@@ -138,6 +162,7 @@ async function importCatalog() {
                         }]
                     }
                 });
+                globalItemCounter++;
             }
         }
 
