@@ -18,6 +18,7 @@ import {
     Order
 } from 'square';
 import * as crypto from 'crypto';
+import { Client, Environment } from 'square';
 
 interface IItemObject {
     name: string;
@@ -54,6 +55,7 @@ interface ITaxObject {
 }
 
 export class SquareManager extends SquareBaseClient {
+    public client: Client;
     private catalogApi: CatalogApi;
     private ordersApi: OrdersApi;
     private paymentsApi: PaymentsApi;
@@ -63,6 +65,10 @@ export class SquareManager extends SquareBaseClient {
 
     constructor() {
         super();
+        this.client = new Client({
+            accessToken: process.env.AUTH_TOKEN,
+            environment: Environment.Production
+        });
         this.catalogApi = this.client.catalogApi;
         this.ordersApi = this.client.ordersApi;
         this.paymentsApi = this.client.paymentsApi;
