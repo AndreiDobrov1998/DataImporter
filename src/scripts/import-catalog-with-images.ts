@@ -33,11 +33,23 @@ const argv = yargs(hideBin(process.argv))
         description: 'Number of categories to import',
         default: 3
     })
-    .option('items', {
+    .option('items-per-category', {
         alias: 'i',
         type: 'number',
         description: 'Number of items per category',
         default: 10
+    })
+    .option('items-with-variations', {
+        alias: 'v',
+        type: 'number',
+        description: 'Number of items with variations per category',
+        default: 5
+    })
+    .option('variations-per-item', {
+        alias: 'n',
+        type: 'number',
+        description: 'Number of variations per item with variations',
+        default: 3
     })
     .option('modifier-groups', {
         alias: 'g',
@@ -120,7 +132,7 @@ async function downloadAndSaveImage(
 }
 
 // Increase concurrency for image uploads
-const limit = pLimit(10); // Increased from 2 to 10
+const limit = pLimit(10); 
 
 // Add rate limiting for image downloads
 const downloadLimit = pLimit(3); // Limit concurrent downloads to 3
@@ -309,48 +321,68 @@ async function importCatalog() {
             const [categoryImageId] = await Promise.all([
                 limit(() => generateAndUploadImage(`Category${categoryIndex + 1}`, catalogClient)),
                 // Process all items for this category in parallel
-                ...Array.from({ length: argv.items }, async (_, itemIndex) => {
+                ...Array.from({ length: argv['items-per-category'] }, async (_, itemIndex) => {
                     let itemIdNum;
                     // Ensure unique item/variation IDs in parallel
                     // Use a lock object to avoid race conditions
                     if (!itemCounterLock[categoryIndex]) itemCounterLock[categoryIndex] = 0;
-                    itemIdNum = categoryIndex * argv.items + itemIndex + 1;
+                    itemIdNum = categoryIndex * argv['items-per-category'] + itemIndex + 1;
                     const itemId = `Item${itemIdNum}`;
+                    
                     // Assign modifier list in round-robin fashion
                     const randomModifierListId = modifierListIdMappings[(itemIdNum - 1) % modifierListIdMappings.length];
                     if (!randomModifierListId) {
                         logWithTimestamp(`Skipping item ${itemId} - no modifier list ID found`, 'warn');
                         return;
                     }
+
                     try {
-                        // Generate item and variation images in parallel
-                        const numVariations = faker.number.int({ min: 1, max: 10 });
-                        const [itemImageId, ...variationImageIds] = await Promise.all([
-                            limit(() => generateAndUploadImage(itemId, catalogClient)),
-                            ...Array.from({ length: numVariations }, (_, i) =>
-                                limit(() => generateAndUploadImage(`Variation${itemIdNum}_${i + 1}`, catalogClient))
-                            )
-                        ]);
-                        const variations = variationImageIds.map((imageId, i) => ({
-                            type: 'ITEM_VARIATION',
-                            id: `#Variation${itemIdNum}_${i + 1}`,
-                            presentAtAllLocations: true,
-                            itemVariationData: {
-                                name: `Variation ${i + 1}`,
-                                pricingType: 'FIXED_PRICING',
-                                priceMoney: {
-                                    amount: BigInt(faker.number.int({ min: 100, max: 1000 })),
-                                    currency: 'USD'
-                                },
-                                imageIds: [imageId]
-                            }
-                        }));
+                        // Determine if this item should have variations
+                        const hasVariations = itemIndex < argv['items-with-variations'];
+                        
+                        // Generate image for the item
+                        const itemImageId = await generateAndUploadImage(`Item${itemIdNum}`, catalogClient);
+                        
+                        // Generate variations with their own images
+                        const variations = hasVariations 
+                            ? await Promise.all(Array.from({ length: argv['variations-per-item'] }, async (_, i) => {
+                                const variationImageId = await generateAndUploadImage(`Variation${itemIdNum}_${i + 1}`, catalogClient);
+                                return {
+                                    type: 'ITEM_VARIATION',
+                                    id: `#Variation${itemIdNum}_${i + 1}`,
+                                    presentAtAllLocations: true,
+                                    itemVariationData: {
+                                        name: `Variation ${i + 1}`,
+                                        pricingType: 'FIXED_PRICING',
+                                        priceMoney: {
+                                            amount: BigInt(faker.number.int({ min: 100, max: 1000 })),
+                                            currency: 'USD'
+                                        },
+                                        imageIds: [variationImageId]
+                                    }
+                                };
+                            }))
+                            : [{
+                                type: 'ITEM_VARIATION',
+                                id: `#Variation${itemIdNum}_1`,
+                                presentAtAllLocations: true,
+                                itemVariationData: {
+                                    name: 'Regular',
+                                    pricingType: 'FIXED_PRICING',
+                                    priceMoney: {
+                                        amount: BigInt(faker.number.int({ min: 100, max: 1000 })),
+                                        currency: 'USD'
+                                    },
+                                    imageIds: [itemImageId]
+                                }
+                            }];
+
                         allItems.push({
                             type: 'ITEM',
                             id: `#Item${itemIdNum}`,
                             presentAtAllLocations: true,
                             itemData: {
-                                name: `Item SQ-${String(itemIdNum).padStart(4, '0')}`,
+                                name: `Item SQ-${String(itemIdNum).padStart(4, '0')}${hasVariations ? ' (with variations)' : ''}`,
                                 categories: [{ id: realCategoryId }],
                                 modifierListInfo: [{
                                     modifierListId: randomModifierListId,

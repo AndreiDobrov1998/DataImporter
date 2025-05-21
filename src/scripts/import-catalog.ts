@@ -27,11 +27,23 @@ const argv = yargs(hideBin(process.argv))
         description: 'Number of categories to import',
         default: 3
     })
-    .option('items', {
+    .option('items-per-category', {
         alias: 'i',
         type: 'number',
         description: 'Number of items per category',
         default: 10
+    })
+    .option('items-with-variations', {
+        alias: 'v',
+        type: 'number',
+        description: 'Number of items with variations per category',
+        default: 5
+    })
+    .option('variations-per-item', {
+        alias: 'n',
+        type: 'number',
+        description: 'Number of variations per item with variations',
+        default: 3
     })
     .option('modifier-groups', {
         alias: 'g',
@@ -122,7 +134,7 @@ async function importCatalog() {
         }
 
         // Generate all items
-        const itemsPerCategory = argv.items;
+        const itemsPerCategory = argv['items-per-category'];
         const allItems: CatalogObject[] = [];
         let globalItemCounter = 1;
         
@@ -135,31 +147,50 @@ async function importCatalog() {
                 const clientModifierListId = `#ModifierList${randomModifierListIndex + 1}`;
                 const realModifierListId = modifierListIdMap[clientModifierListId] || clientModifierListId;
 
+                // Determine if this item should have variations
+                const hasVariations = itemIndex < argv['items-with-variations'];
+                const variations = hasVariations 
+                    ? Array.from({ length: argv['variations-per-item'] }, (_, i) => ({
+                        type: 'ITEM_VARIATION',
+                        id: `#Variation${globalItemCounter}_${i + 1}`,
+                        presentAtAllLocations: true,
+                        itemVariationData: {
+                            itemId: `#Item${globalItemCounter}`,
+                            name: `Variation ${i + 1}`,
+                            pricingType: 'FIXED_PRICING',
+                            priceMoney: {
+                                amount: BigInt(faker.number.int({ min: 100, max: 1000 })),
+                                currency: 'USD'
+                            }
+                        }
+                    }))
+                    : [{
+                        type: 'ITEM_VARIATION',
+                        id: `#Variation${globalItemCounter}_1`,
+                        presentAtAllLocations: true,
+                        itemVariationData: {
+                            itemId: `#Item${globalItemCounter}`,
+                            name: 'Regular',
+                            pricingType: 'FIXED_PRICING',
+                            priceMoney: {
+                                amount: BigInt(faker.number.int({ min: 100, max: 1000 })),
+                                currency: 'USD'
+                            }
+                        }
+                    }];
+
                 allItems.push({
                     type: 'ITEM',
                     id: `#Item${globalItemCounter}`,
                     presentAtAllLocations: true,
                     itemData: {
-                        name: `Item SQ-${String(globalItemCounter).padStart(4, '0')}`,
+                        name: `Item SQ-${String(globalItemCounter).padStart(4, '0')}${hasVariations ? ' (with variations)' : ''}`,
                         categories: [{ id: realCategoryId }],
                         modifierListInfo: [{
                             modifierListId: realModifierListId,
                             enabled: true
                         }],
-                        variations: [{
-                            type: 'ITEM_VARIATION',
-                            id: `#Variation${globalItemCounter}`,
-                            presentAtAllLocations: true,
-                            itemVariationData: {
-                                itemId: `#Item${globalItemCounter}`,
-                                name: 'Default',
-                                pricingType: 'FIXED_PRICING',
-                                priceMoney: {
-                                    amount: BigInt(faker.number.int({ min: 100, max: 1000 })),
-                                    currency: 'USD'
-                                }
-                            }
-                        }]
+                        variations: variations
                     }
                 });
                 globalItemCounter++;
