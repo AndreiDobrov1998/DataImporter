@@ -25,4 +25,7 @@ logs/
 *.log
 
 # Testing
-coverage/ 
+coverage/
+
+# Ignore output folder
+output/ 
