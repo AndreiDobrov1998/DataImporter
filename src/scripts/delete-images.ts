@@ -1,5 +1,6 @@
 import { SquareManager } from '../module/external/square/catalog/api/SquareCatalogClient';
 import * as dotenv from 'dotenv';
+import { BatchDeleteCatalogObjectsRequest } from 'square';
 
 // Load environment variables
 dotenv.config();
@@ -41,7 +42,7 @@ async function deleteAllImages() {
         }
 
         // Delete images in batches to avoid rate limiting
-        const batchSize = 10;
+        const batchSize = 100;
         let deletedCount = 0;
         let errorCount = 0;
 
@@ -49,16 +50,28 @@ async function deleteAllImages() {
             const batch = images.slice(i, i + batchSize);
             console.log(`\nDeleting batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(images.length / batchSize)}...`);
             
-            for (const image of batch) {
-                try {
-                    console.log(`Attempting to delete image: ${image.id}`);
-                    await catalogClient.client.catalogApi.deleteCatalogObject(image.id);
-                    deletedCount++;
-                    console.log(`Successfully deleted image: ${image.id}`);
-                } catch (error: any) {
-                    errorCount++;
-                    console.error(`Error deleting image ${image.id}:`, error.response?.data || error.message);
+            try {
+                // Create batch delete request
+                const batchRequest: BatchDeleteCatalogObjectsRequest = {
+                    objectIds: batch.map(image => image.id)
+                };
+
+                console.log(`Attempting to delete batch of ${batch.length} images...`);
+                const response = await catalogClient.client.catalogApi.batchDeleteCatalogObjects(batchRequest);
+                
+                if (response.result.deletedObjectIds) {
+                    deletedCount += response.result.deletedObjectIds.length;
+                    console.log(`Successfully deleted ${response.result.deletedObjectIds.length} images in this batch`);
                 }
+
+                if (response.result.errors && response.result.errors.length > 0) {
+                    errorCount += response.result.errors.length;
+                    console.error('Errors in batch:', response.result.errors);
+                }
+
+            } catch (error: any) {
+                errorCount += batch.length;
+                console.error(`Error deleting batch:`, error.response?.data || error.message);
             }
 
             // Add a small delay between batches to avoid rate limiting
