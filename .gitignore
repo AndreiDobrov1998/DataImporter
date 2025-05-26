@@ -28,4 +28,5 @@ logs/
 coverage/
 
 # Ignore output folder
-output/ 
+output/
+temp_images/ 
