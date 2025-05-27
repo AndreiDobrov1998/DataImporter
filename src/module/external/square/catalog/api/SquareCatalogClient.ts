@@ -405,4 +405,64 @@ export class SquareManager extends SquareBaseClient {
             await this.batchDeleteCatalogObjects(taxIds);
         }
     }
+
+    async getAllCatalogItems(types?: string[]): Promise<any[]> {
+        let allObjects: any[] = [];
+        let cursor: string | undefined = undefined;
+
+        do {
+            const { result } = await this.client.catalogApi.listCatalog(cursor, types?.join());
+            if (result.objects) {
+                allObjects = allObjects.concat(result.objects);
+            }
+            cursor = result.cursor;
+        } while (cursor);
+
+        return allObjects;
+    }
+
+    public generateRandomPrice(min: number, max: number): number {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    async createPayment(orderId: string, paymentType: string, locationId: string): Promise<any> {
+        try {
+            console.log(`Creating payment for order ID: ${orderId}`);
+            
+            // Get the order details to get the total amount
+            const orderResponse = await this.ordersApi.retrieveOrder(orderId);
+            const order = orderResponse.result.order;
+            
+            if (!order || !order.totalMoney || order.totalMoney.amount === null || order.totalMoney.amount === undefined) {
+                throw new Error(`Could not retrieve order total for order ID: ${orderId}`);
+            }
+
+            const response = await this.paymentsApi.createPayment({
+                sourceId: 'cash',
+                amountMoney: {
+                    amount: BigInt(order.totalMoney.amount),
+                    currency: order.totalMoney.currency || 'USD'
+                },
+                orderId: orderId,
+                locationId: locationId,
+                idempotencyKey: crypto.randomUUID(),
+                cashDetails: {
+                    buyerSuppliedMoney: {
+                        amount: BigInt(order.totalMoney.amount),
+                        currency: order.totalMoney.currency || 'USD'
+                    }
+                }
+            });
+            console.log(`Payment creation response received for order ID: ${orderId}`);
+            if (response.result.payment) {
+                console.log(`Payment created successfully for order ID: ${orderId}, Payment ID: ${response.result.payment.id}, Amount: ${order.totalMoney.amount} ${order.totalMoney.currency}`);
+            } else {
+                console.error('Payment creation response did not include a payment object.');
+            }
+            return response.result.payment;
+        } catch (error) {
+            console.error('Error creating payment:', error);
+            throw error;
+        }
+    }
 } 

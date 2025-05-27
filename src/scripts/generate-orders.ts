@@ -37,38 +37,21 @@ async function generateOrders() {
                           console.error('No location ID found, skipping order creation.');
                           return;
                         }
-                        await client.createOrder(
+                        const order = await client.createOrder(
                           location.id,
                           [{ catalogObjectId: itemId, quantity: quantity.toString() }]
                         );
+                        console.log(`Order created: ID=${order.id}`);
                     } catch (error) {
-                        console.error(`Error creating order for item ${itemId}:`, error);
+                        console.error(`Error: ${(error as Error).message}`);
                     }
                 });
-
-                // Wait for all orders in the batch to complete
                 await Promise.all(promises);
-                
-                // Small delay between batches to avoid overwhelming the API
-                await new Promise(resolve => setTimeout(resolve, 1000));
             }
-            
-            console.log('Completed one full cycle of orders. Starting next cycle...');
-            // Brief pause between cycles
-            await new Promise(resolve => setTimeout(resolve, 1000));
         }
     } catch (error) {
-        console.error('Fatal error:', error);
-        process.exit(1);
+        console.error(`Error: ${(error as Error).message}`);
     }
 }
 
-// Handle process termination
-process.on('SIGINT', () => {
-    console.log('\nStopping order generation...');
-    process.exit(0);
-});
-
-// Start generating orders
-console.log('Starting order generation. Press Ctrl+C to stop.');
-generateOrders(); 
+generateOrders();
