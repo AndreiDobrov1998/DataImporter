@@ -1,20 +1,34 @@
 import { SquareManager } from '../module/external/square/catalog/api/SquareCatalogClient';
 import * as dotenv from 'dotenv';
+import yargs from 'yargs';
+import { hideBin } from 'yargs/helpers';
 
 // Load environment variables
 dotenv.config();
 
-// Validate required environment variables
-const requiredEnvVars = ['AUTH_TOKEN'];
-for (const envVar of requiredEnvVars) {
-    if (!process.env[envVar]) {
-        console.error(`Error: ${envVar} environment variable is required`);
-        process.exit(1);
-    }
+// Parse command-line arguments
+const argv = yargs(hideBin(process.argv))
+    .command('create', 'Create default taxes')
+    .command('list', 'List all taxes')
+    .command('delete', 'Delete all taxes')
+    .option('access-token', {
+        alias: 't',
+        type: 'string',
+        description: 'Square API access token (overrides .env AUTH_TOKEN)'
+    })
+    .demandCommand(1, 'You need to specify a command')
+    .help()
+    .argv as any;
+
+// Get access token from command line or environment
+const accessToken = argv['access-token'] || process.env.AUTH_TOKEN;
+if (!accessToken) {
+    console.error('Error: Access token is required. Provide it via --access-token or AUTH_TOKEN environment variable');
+    process.exit(1);
 }
 
 async function createTaxes() {
-    const squareManager = new SquareManager();
+    const squareManager = new SquareManager(accessToken);
     try {
         // Example taxes
         const taxes = [
@@ -46,7 +60,7 @@ async function createTaxes() {
 }
 
 async function listTaxes() {
-    const squareManager = new SquareManager();
+    const squareManager = new SquareManager(accessToken);
     try {
         console.log('Listing taxes...');
         const taxes = await squareManager.listTaxes();
@@ -58,7 +72,7 @@ async function listTaxes() {
 }
 
 async function deleteTaxes() {
-    const squareManager = new SquareManager();
+    const squareManager = new SquareManager(accessToken);
     try {
         console.log('Deleting all taxes...');
         await squareManager.deleteTaxes();
@@ -69,8 +83,8 @@ async function deleteTaxes() {
     }
 }
 
-// Parse command line arguments
-const command = process.argv[2];
+// Execute the command
+const command = argv._[0];
 
 switch (command) {
     case 'create':
@@ -83,10 +97,6 @@ switch (command) {
         deleteTaxes();
         break;
     default:
-        console.log('Usage: npm run manage-taxes <command>');
-        console.log('Commands:');
-        console.log('  create - Create default taxes');
-        console.log('  list   - List all taxes');
-        console.log('  delete - Delete all taxes');
+        console.error('Invalid command. Use --help to see available commands.');
         process.exit(1);
 } 

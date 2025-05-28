@@ -4,30 +4,57 @@ import * as path from 'path';
 import * as dotenv from 'dotenv';
 import { FileWrapper } from 'square';
 import { Readable } from 'stream';
+import yargs from 'yargs';
+import { hideBin } from 'yargs/helpers';
 
 // Load environment variables
 dotenv.config();
 
 // Parse command line arguments
-const args = process.argv.slice(2);
-const argMap = new Map<string, string>();
-
-for (let i = 0; i < args.length; i += 2) {
-    if (args[i].startsWith('--')) {
-        argMap.set(args[i].slice(2), args[i + 1]);
-    }
-}
+const argv = yargs(hideBin(process.argv))
+    .option('format', {
+        type: 'string',
+        description: 'Image format (jpg, jpeg, png, gif)',
+        default: 'jpg'
+    })
+    .option('total-images', {
+        type: 'number',
+        description: 'Total number of images to generate',
+        default: 10
+    })
+    .option('batch-size', {
+        type: 'number',
+        description: 'Number of images to upload in each batch',
+        default: 5
+    })
+    .option('base-size', {
+        type: 'number',
+        description: 'Base image size in pixels',
+        default: 1800
+    })
+    .option('font-size', {
+        type: 'number',
+        description: 'Font size for numbers',
+        default: 750
+    })
+    .option('access-token', {
+        alias: 't',
+        type: 'string',
+        description: 'Square API access token (overrides .env AUTH_TOKEN)'
+    })
+    .help()
+    .argv as any;
 
 // Configuration with command line overrides
-const BASE_IMAGE_SIZE = parseInt(argMap.get('base-size') || '1800');
-const FONT_SIZE = parseInt(argMap.get('font-size') || '750');
-const OUTPUT_DIR = argMap.get('output-dir') || 'output';
-const IMAGE_FORMAT = (argMap.get('format') || 'jpg').toLowerCase();
+const BASE_IMAGE_SIZE = argv['base-size'];
+const FONT_SIZE = argv['font-size'];
+const OUTPUT_DIR = 'output';
+const IMAGE_FORMAT = argv.format.toLowerCase();
 // Add timestamp for unique run folder
 const RUN_TIMESTAMP = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 12);
 const OUTPUT_SUBDIR = path.join(OUTPUT_DIR, IMAGE_FORMAT, RUN_TIMESTAMP);
-const TOTAL_IMAGES = parseInt(argMap.get('total-images') || '10');
-const UPLOAD_BATCH_SIZE = parseInt(argMap.get('batch-size') || '5');
+const TOTAL_IMAGES = argv['total-images'];
+const UPLOAD_BATCH_SIZE = argv['batch-size'];
 
 // Validate image format
 const VALID_FORMATS = ['jpg', 'jpeg', 'png', 'gif'];
@@ -39,13 +66,11 @@ if (!VALID_FORMATS.includes(IMAGE_FORMAT)) {
 // Calculate padding length based on total images
 const PADDING_LENGTH = TOTAL_IMAGES.toString().length;
 
-// Validate required environment variables
-const requiredEnvVars = ['AUTH_TOKEN'];
-for (const envVar of requiredEnvVars) {
-    if (!process.env[envVar]) {
-        console.error(`Error: ${envVar} environment variable is required`);
-        process.exit(1);
-    }
+// Get access token from command line or environment
+const accessToken = argv['access-token'] || process.env.AUTH_TOKEN;
+if (!accessToken) {
+    console.error('Error: Access token is required. Provide it via --access-token or AUTH_TOKEN environment variable');
+    process.exit(1);
 }
 
 // Print configuration

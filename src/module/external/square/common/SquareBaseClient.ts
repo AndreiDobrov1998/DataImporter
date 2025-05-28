@@ -4,10 +4,10 @@ import { v4 as uuidV4 } from 'uuid';
 export class SquareBaseClient {
     protected readonly client: Client;
 
-    constructor() {
+    constructor(accessToken?: string) {
         this.client = new Client({
             bearerAuthCredentials: {
-                accessToken: process.env.AUTH_TOKEN!,
+                accessToken: accessToken || process.env.AUTH_TOKEN!,
             },
             environment: Environment.Production,
             httpClientOptions: {

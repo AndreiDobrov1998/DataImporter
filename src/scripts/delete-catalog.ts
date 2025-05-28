@@ -1,16 +1,26 @@
 import { SquareManager } from '../module/external/square/catalog/api/SquareCatalogClient';
 import * as dotenv from 'dotenv';
+import yargs from 'yargs';
+import { hideBin } from 'yargs/helpers';
 
 // Load environment variables
 dotenv.config();
 
-// Validate required environment variables
-const requiredEnvVars = ['AUTH_TOKEN'];
-for (const envVar of requiredEnvVars) {
-    if (!process.env[envVar]) {
-        console.error(`Error: ${envVar} environment variable is required`);
-        process.exit(1);
-    }
+// Parse command-line arguments
+const argv = yargs(hideBin(process.argv))
+    .option('access-token', {
+        alias: 't',
+        type: 'string',
+        description: 'Square API access token (overrides .env AUTH_TOKEN)'
+    })
+    .help()
+    .argv as any;
+
+// Get access token from command line or environment
+const accessToken = argv['access-token'] || process.env.AUTH_TOKEN;
+if (!accessToken) {
+    console.error('Error: Access token is required. Provide it via --access-token or AUTH_TOKEN environment variable');
+    process.exit(1);
 }
 
 async function safeBatchDelete(catalogClient: SquareManager, ids: string[], maxRetries = 5) {
@@ -72,7 +82,7 @@ async function deleteAllCatalogObjects(catalogClient: SquareManager) {
 }
 
 async function deleteCatalog() {
-    const catalogClient = new SquareManager();
+    const catalogClient = new SquareManager(accessToken);
     try {
         await deleteAllCatalogObjects(catalogClient);
         console.log('All catalog objects deleted successfully!');

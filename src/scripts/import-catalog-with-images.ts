@@ -16,15 +16,6 @@ import pLimit from 'p-limit';
 // Load environment variables
 dotenv.config();
 
-// Validate required environment variables
-const requiredEnvVars = ['AUTH_TOKEN'];
-for (const envVar of requiredEnvVars) {
-    if (!process.env[envVar]) {
-        console.error(`Error: ${envVar} environment variable is required`);
-        process.exit(1);
-    }
-}
-
 // Parse command-line arguments
 const argv = yargs(hideBin(process.argv))
     .option('categories', {
@@ -63,8 +54,20 @@ const argv = yargs(hideBin(process.argv))
         description: 'Number of modifiers per group',
         default: 5
     })
+    .option('access-token', {
+        alias: 't',
+        type: 'string',
+        description: 'Square API access token (overrides .env AUTH_TOKEN)'
+    })
     .help()
     .argv as any;
+
+// Get access token from command line or environment
+const accessToken = argv['access-token'] || process.env.AUTH_TOKEN;
+if (!accessToken) {
+    console.error('Error: Access token is required. Provide it via --access-token or AUTH_TOKEN environment variable');
+    process.exit(1);
+}
 
 // List of possible LoremFlickr tags for variety
 const loremFlickrTags = [
@@ -244,7 +247,7 @@ async function cleanupTempDirectory() {
 }
 
 async function importCatalog() {
-    const catalogClient = new SquareManager();
+    const catalogClient = new SquareManager(accessToken);
     try {
         logWithTimestamp('Starting catalog import with images. Press Ctrl+C to stop.');
         

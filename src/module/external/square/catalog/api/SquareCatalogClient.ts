@@ -63,10 +63,10 @@ export class SquareManager extends SquareBaseClient {
     private locations: Location[] = [];
     private taxes: CatalogObject[] = [];
 
-    constructor() {
-        super();
+    constructor(accessToken?: string) {
+        super(accessToken);
         this.client = new Client({
-            accessToken: process.env.AUTH_TOKEN,
+            accessToken: accessToken || process.env.AUTH_TOKEN,
             environment: Environment.Production
         });
         this.catalogApi = this.client.catalogApi;

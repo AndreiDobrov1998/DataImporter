@@ -1,13 +1,52 @@
 import { faker } from '@faker-js/faker';
 import { SquareManager } from '../module/external/square/catalog/api/SquareCatalogClient';
 import * as dotenv from 'dotenv';
+import yargs from 'yargs';
+import { hideBin } from 'yargs/helpers';
+import pLimit from 'p-limit';
 
+// Load environment variables
 dotenv.config();
 
+// Parse command-line arguments
+const argv = yargs(hideBin(process.argv))
+    .option('min-quantity', {
+        alias: 'min',
+        type: 'number',
+        description: 'Minimum quantity per order',
+        default: 1
+    })
+    .option('max-quantity', {
+        alias: 'max',
+        type: 'number',
+        description: 'Maximum quantity per order',
+        default: 3
+    })
+    .option('concurrency', {
+        alias: 'c',
+        type: 'number',
+        description: 'Number of concurrent orders to process',
+        default: 10
+    })
+    .option('access-token', {
+        alias: 't',
+        type: 'string',
+        description: 'Square API access token (overrides .env AUTH_TOKEN)'
+    })
+    .help()
+    .argv as any;
+
+// Get access token from command line or environment
+const accessToken = argv['access-token'] || process.env.AUTH_TOKEN;
+if (!accessToken) {
+    console.error('Error: Access token is required. Provide it via --access-token or AUTH_TOKEN environment variable');
+    process.exit(1);
+}
+
 // Constants
-const MIN_QUANTITY = 1;
-const MAX_QUANTITY = 3;
-const ORDER_DELAY_MS = 1000;
+const MIN_QUANTITY = argv['min-quantity'];
+const MAX_QUANTITY = argv['max-quantity'];
+const CONCURRENCY = argv.concurrency;
 
 interface OrderCreationResult {
     orderId: string;
@@ -31,7 +70,6 @@ async function createOrderWithPayment(
             return null;
         }
 
-        console.log(`Creating order for variation ${variationId} of item ${itemId} with quantity ${quantity}`);
         const order = await catalogClient.createOrder(
             location.id,
             [{ catalogObjectId: variationId, quantity: quantity.toString() }]
@@ -42,11 +80,8 @@ async function createOrderWithPayment(
             return null;
         }
 
-        console.log(`Created order for variation ${variationId} of item ${itemId} with quantity ${quantity}, Order ID: ${order.id}`);
-        
-        console.log(`Creating payment for order ${order.id}`);
         const payment = await catalogClient.createPayment(order.id, 'CASH', location.id);
-        console.log(`Created cash payment for order ${order.id}, Payment ID: ${payment.id}`);
+        console.log(`Created order ${order.id} with payment ${payment.id} (${quantity} items)`);
 
         return {
             orderId: order.id,
@@ -71,34 +106,51 @@ async function processCatalogItems(catalogClient: SquareManager): Promise<void> 
         console.log(`Found ${catalogItems.length} items in the catalog.`);
         
         const results: OrderCreationResult[] = [];
+        let skippedItems = 0;
+        
+        // Create a list of all variations to process
+        const variationsToProcess: { variationId: string; itemId: string }[] = [];
         
         for (const item of catalogItems) {
             if (!item.itemData?.variations || item.itemData.variations.length === 0) {
-                console.log(`Skipping item ${item.id} as it has no variations`);
+                skippedItems++;
                 continue;
             }
 
-            // Create an order for each variation
             for (const variation of item.itemData.variations) {
                 if (!variation.id) {
-                    console.log(`Skipping variation with no ID for item ${item.id}`);
+                    skippedItems++;
                     continue;
                 }
-
-                const result = await createOrderWithPayment(variation.id, item.id, catalogClient);
-                if (result) {
-                    results.push(result);
-                }
-
-                // Add a delay between orders to avoid rate limiting
-                await new Promise(resolve => setTimeout(resolve, ORDER_DELAY_MS));
+                variationsToProcess.push({
+                    variationId: variation.id,
+                    itemId: item.id
+                });
             }
         }
+
+        console.log(`Processing ${variationsToProcess.length} variations with concurrency ${CONCURRENCY}`);
+
+        // Create a rate limiter with fixed concurrency
+        const limit = pLimit(CONCURRENCY);
+
+        // Process all variations concurrently with rate limiting
+        const promises = variationsToProcess.map(({ variationId, itemId }) => 
+            limit(() => createOrderWithPayment(variationId, itemId, catalogClient))
+        );
+
+        // Wait for all promises to resolve
+        const batchResults = await Promise.all(promises);
+        
+        // Filter out null results and add to results array
+        results.push(...batchResults.filter((result): result is OrderCreationResult => result !== null));
 
         // Log summary
         console.log('\nOrder Generation Summary:');
         console.log(`Total orders created: ${results.length}`);
         console.log(`Total items processed: ${catalogItems.length}`);
+        console.log(`Items skipped: ${skippedItems}`);
+        console.log(`Concurrency level: ${CONCURRENCY}`);
     } catch (error) {
         console.error('Fatal error:', error);
         throw error;
@@ -108,7 +160,7 @@ async function processCatalogItems(catalogClient: SquareManager): Promise<void> 
 // Main execution
 async function main() {
     try {
-        const catalogClient = new SquareManager();
+        const catalogClient = new SquareManager(accessToken);
         await processCatalogItems(catalogClient);
     } catch (error) {
         console.error('Fatal error:', error);

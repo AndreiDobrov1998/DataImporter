@@ -1,213 +1,142 @@
 # Square Order Generator
 
-A TypeScript-based toolset for managing Square catalog items, locations, and orders. This project provides a collection of scripts to automate various Square API operations, including image generation, catalog management, and order processing.
+A Node.js application for generating test data in Square, including locations, catalog items, and orders.
 
-## Scripts
+## Prerequisites
 
-### Catalog Management
+- Node.js (v14 or higher)
+- Square Developer Account
+- Square API Access Token
 
-#### Generate Numbered Images
-`src/scripts/generate-numbered-images.ts`
+## Installation
 
-Generates numbered images and optionally uploads them to Square catalog.
-
-**Configuration Options:**
-- `--format`: Image format (jpg, jpeg, png, gif) [default: jpg]
-- `--total-images`: Total number of images to generate [default: 10]
-- `--batch-size`: Number of images to upload in each batch [default: 10]
-- `--base-size`: Base image size in pixels [default: 1800]
-- `--font-size`: Font size for numbers [default: 750]
-- `--padding-length`: Number of digits to pad with zeros [default: auto-calculated]
-
-**Examples:**
+1. Clone the repository:
 ```bash
-# Generate 10 JPEG images
-npx ts-node src/scripts/generate-numbered-images.ts
-
-# Generate 3000 PNG images with custom size
-npx ts-node src/scripts/generate-numbered-images.ts --format png --total-images 3000 --base-size 2000
-
-# Generate 50 GIF images with custom font size
-npx ts-node src/scripts/generate-numbered-images.ts --format gif --total-images 50 --font-size 500
+git clone https://github.com/yourusername/square-order-generator.git
+cd square-order-generator
 ```
 
-#### Delete Catalog Images
-`src/scripts/delete-images.ts`
-
-Deletes all images from the Square catalog.
-
-**Configuration Options:**
-- `--batch-size`: Number of images to delete in each batch [default: 100]
-- `--delay`: Delay between batches in milliseconds [default: 1000]
-
-**Examples:**
+2. Install dependencies:
 ```bash
-# Delete all images with default settings
-npx ts-node src/scripts/delete-images.ts
-
-# Delete images with custom batch size and delay
-npx ts-node src/scripts/delete-images.ts --batch-size 50 --delay 2000
+npm install
 ```
 
-#### Import Catalog
-`src/scripts/import-catalog.ts`
-
-Imports catalog items with categories and modifiers.
-
-**Configuration Options:**
-- `--categories` or `-c`: Number of categories to create [default: 3]
-- `--items` or `-i`: Number of items per category [default: 10]
-- `--modifier-groups` or `-g`: Number of modifier groups [default: 3]
-- `--modifiers-per-group` or `-m`: Number of modifiers per group [default: 5]
-
-**Examples:**
-```bash
-# Import catalog with default parameters
-npx ts-node src/scripts/import-catalog.ts
-
-# Import catalog with custom parameters
-npx ts-node src/scripts/import-catalog.ts --categories 5 --items 15 --modifier-groups 4 --modifiers-per-group 6
+3. Create a `.env` file in the root directory with your Square API access token:
+```
+AUTH_TOKEN=your_square_access_token_here
 ```
 
-#### Import Catalog with Images
-`src/scripts/import-catalog-with-images.ts`
+## Available Scripts
 
-Imports catalog items with images, categories, and modifiers.
+### Create Multiple Locations
 
-**Configuration Options:**
-- Same as import-catalog.ts
-- Images are automatically downloaded and processed to 800x800 JPEG format
-- Includes parallel processing with rate limiting
+Creates multiple locations in your Square account.
 
-**Examples:**
 ```bash
-# Import catalog with images using default parameters
-npx ts-node src/scripts/import-catalog-with-images.ts
-
-# Import catalog with images using custom parameters
-npx ts-node src/scripts/import-catalog-with-images.ts --categories 5 --items 15
+npx ts-node src/scripts/create-locations.ts --count 300
 ```
 
-#### Delete Catalog
-`src/scripts/delete-catalog.ts`
+Configuration options:
+- `--count` or `-c`: Number of locations to create (default: 300)
+- `--access-token` or `-t`: Square API access token (overrides .env AUTH_TOKEN)
 
-Deletes all catalog items from Square.
-
-**Examples:**
+Example:
 ```bash
-# Delete all catalog items
-npx ts-node src/scripts/delete-catalog.ts
+# Create 300 locations using .env AUTH_TOKEN
+npx ts-node src/scripts/create-locations.ts --count 300
+
+# Create 100 locations with custom access token
+npx ts-node src/scripts/create-locations.ts --count 100 --access-token "your_token_here"
 ```
 
-### Location Management
+### Delete All Locations
 
-#### Create Location
-`src/scripts/create-location.ts`
+Deletes all locations in your Square account by setting them to inactive.
 
-Creates a new Square location.
-
-**Configuration Options:**
-- `--name`: Location name [required]
-- `--address`: Location address [required]
-- `--phone`: Location phone number [optional]
-- `--website`: Location website [optional]
-
-**Examples:**
 ```bash
-# Create a new location
-npx ts-node src/scripts/create-location.ts --name "Main Store" --address "123 Main St"
-```
-
-#### Create Multiple Locations
-`src/scripts/create-locations.ts`
-
-Creates multiple Square locations.
-
-**Configuration Options:**
-- `--count`: Number of locations to create [default: 1]
-
-**Examples:**
-```bash
-# Create 5 locations
-npx ts-node src/scripts/create-locations.ts --count 5
-```
-
-#### Delete Locations
-`src/scripts/delete-locations.ts`
-
-Deletes a specific number of locations.
-
-**Configuration Options:**
-- `--count`: Number of locations to delete [default: 1]
-
-**Examples:**
-```bash
-# Delete 3 locations
-npx ts-node src/scripts/delete-locations.ts --count 3
-```
-
-#### Delete All Locations
-`src/scripts/delete-all-locations.ts`
-
-Deletes all locations from Square.
-
-**Examples:**
-```bash
-# Delete all locations
 npx ts-node src/scripts/delete-all-locations.ts
 ```
 
-### Order Management
+Configuration options:
+- `--access-token` or `-t`: Square API access token (overrides .env AUTH_TOKEN)
 
-#### Generate Orders
-`src/scripts/generate-orders.ts`
-
-Generates test orders in Square.
-
-**Configuration Options:**
-- `--total-orders`: Number of orders to generate [default: 10]
-- `--items-per-order`: Number of items per order [default: 3]
-- `--location-id`: Square location ID [required]
-
-**Examples:**
+Example:
 ```bash
-# Generate 10 orders with 3 items each
-npx ts-node src/scripts/generate-orders.ts --location-id "LOCATION_ID"
+# Delete all locations using .env AUTH_TOKEN
+npx ts-node src/scripts/delete-all-locations.ts
 
-# Generate 50 orders with 5 items each
-npx ts-node src/scripts/generate-orders.ts --total-orders 50 --items-per-order 5 --location-id "LOCATION_ID"
+# Delete all locations with custom access token
+npx ts-node src/scripts/delete-all-locations.ts --access-token "your_token_here"
 ```
 
-#### Generate Order Data
-`src/scripts/order-data-generator.ts`
+### Generate Numbered Images
 
-Generates orders for all catalog items.
+Generates numbered images for catalog items.
 
-**Features:**
-- Fetches all catalog items
-- Generates orders with random quantities (1-3)
-- Applies taxes if available
-- Includes delay between orders to avoid rate limiting
-
-**Examples:**
 ```bash
-# Generate orders for all catalog items
-npx ts-node src/scripts/order-data-generator.ts
+npx ts-node src/scripts/generate-numbered-images.ts --count 30
 ```
 
-### Tax Management
+Configuration options:
+- `--count` or `-c`: Number of images to generate (default: 30)
+- `--access-token` or `-t`: Square API access token (overrides .env AUTH_TOKEN)
 
-#### Manage Taxes
-`src/scripts/manage-taxes.ts`
+Example:
+```bash
+# Generate 30 images using .env AUTH_TOKEN
+npx ts-node src/scripts/generate-numbered-images.ts --count 30
 
-Manages Square taxes.
+# Generate 50 images with custom access token
+npx ts-node src/scripts/generate-numbered-images.ts --count 50 --access-token "your_token_here"
+```
 
-**Commands:**
-- `create`: Create taxes
-- `list`: List all taxes
-- `delete`: Delete all taxes
+### Import Catalog with Images
 
-**Examples:**
+Imports catalog items with images into your Square account.
+
+```bash
+npx ts-node src/scripts/import-catalog-with-images.ts
+```
+
+Configuration options:
+- `--access-token` or `-t`: Square API access token (overrides .env AUTH_TOKEN)
+
+Example:
+```bash
+# Import catalog using .env AUTH_TOKEN
+npx ts-node src/scripts/import-catalog-with-images.ts
+
+# Import catalog with custom access token
+npx ts-node src/scripts/import-catalog-with-images.ts --access-token "your_token_here"
+```
+
+### Generate Orders
+
+Generates orders with random quantities for each catalog item variation.
+
+```bash
+npx ts-node src/scripts/order-data-generator.ts --min-quantity 2 --max-quantity 5 --concurrency 10
+```
+
+Configuration options:
+- `--min-quantity` or `-min`: Minimum quantity per order (default: 1)
+- `--max-quantity` or `-max`: Maximum quantity per order (default: 3)
+- `--concurrency` or `-c`: Number of concurrent orders to process (default: 10)
+- `--access-token` or `-t`: Square API access token (overrides .env AUTH_TOKEN)
+
+Example:
+```bash
+# Generate orders with quantities 2-5 using 10 concurrent workers
+npx ts-node src/scripts/order-data-generator.ts --min-quantity 2 --max-quantity 5 --concurrency 10
+
+# Generate orders with custom parameters and access token
+npx ts-node src/scripts/order-data-generator.ts --min-quantity 1 --max-quantity 10 --concurrency 20 --access-token "your_token_here"
+```
+
+### Manage Taxes
+
+Manages tax rates in your Square account.
+
 ```bash
 # Create taxes
 npx ts-node src/scripts/manage-taxes.ts create
@@ -219,58 +148,48 @@ npx ts-node src/scripts/manage-taxes.ts list
 npx ts-node src/scripts/manage-taxes.ts delete
 ```
 
-## Environment Setup
+Configuration options:
+- `--access-token` or `-t`: Square API access token (overrides .env AUTH_TOKEN)
 
-1. Create a `.env` file in the root directory with your Square API credentials:
-```
-SQUARE_ACCESS_TOKEN=your_access_token
-SQUARE_ENVIRONMENT=sandbox
-```
-
-2. Install dependencies:
+Example:
 ```bash
-npm install
+# Create taxes using .env AUTH_TOKEN
+npx ts-node src/scripts/manage-taxes.ts create
+
+# List taxes with custom access token
+npx ts-node src/scripts/manage-taxes.ts list --access-token "your_token_here"
 ```
 
-## Notes
+## Performance Optimization
 
-- All scripts use TypeScript and require Node.js
-- Make sure to have proper Square API credentials with appropriate permissions
-- The sandbox environment is recommended for testing
-- Generated images are saved in the `output/` directory
-- Temporary files are stored in `temp_images/` directory
+The order generation script (`order-data-generator.ts`) has been optimized for high performance:
 
-## Project Structure
+1. **Parallel Processing**: Uses a worker pool to process multiple orders concurrently
+2. **Configurable Concurrency**: Control the number of concurrent orders with the `--concurrency` option
+3. **No Artificial Delays**: Processes orders as fast as possible while respecting API limits
+4. **Efficient Resource Usage**: Uses `p-limit` for controlled concurrency without memory issues
 
-```
-src/
-├── scripts/
-│   ├── generate-orders.ts
-│   ├── import-catalog.ts
-│   ├── import-catalog-with-images.ts
-│   ├── delete-catalog.ts
-│   ├── delete-images.ts
-│   ├── create-locations.ts
-│   ├── delete-locations.ts
-│   ├── delete-all-locations.ts
-│   ├── manage-taxes.ts
-│   └── order-data-generator.ts
-└── module/
-    └── external/
-        └── square/
-            ├── common/
-            │   └── SquareBaseClient.ts
-            └── catalog/
-                └── api/
-                    ├── SquareCatalogClient.ts
-                    └── SquareManager.ts
+Example of high-performance order generation:
+```bash
+# Process 60 orders with 10 concurrent workers
+npx ts-node src/scripts/order-data-generator.ts --min-quantity 2 --max-quantity 5 --concurrency 10
 ```
 
-## Development
+## Error Handling
 
-- `npm run build` - Build the project
-- `npm run start` - Run the built project
-- `npm run orders-create` - Run the project in development mode
+All scripts include comprehensive error handling:
+- Validates access token presence
+- Handles API rate limits
+- Provides clear error messages
+- Gracefully handles failed operations
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ## License
 

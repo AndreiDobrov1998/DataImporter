@@ -1,11 +1,37 @@
 import { Client, Environment } from 'square';
 import dotenv from 'dotenv';
+import yargs from 'yargs';
+import { hideBin } from 'yargs/helpers';
 
+// Load environment variables
 dotenv.config();
 
+// Parse command-line arguments
+const argv = yargs(hideBin(process.argv))
+    .option('count', {
+        alias: 'c',
+        type: 'number',
+        description: 'Number of locations to delete',
+        default: 1
+    })
+    .option('access-token', {
+        alias: 't',
+        type: 'string',
+        description: 'Square API access token (overrides .env AUTH_TOKEN)'
+    })
+    .help()
+    .argv as any;
+
+// Get access token from command line or environment
+const accessToken = argv['access-token'] || process.env.AUTH_TOKEN;
+if (!accessToken) {
+    console.error('Error: Access token is required. Provide it via --access-token or AUTH_TOKEN environment variable');
+    process.exit(1);
+}
+
 const client = new Client({
-  accessToken: process.env.AUTH_TOKEN,
-  environment: Environment.Production,
+    accessToken,
+    environment: Environment.Production,
 });
 
 async function deleteLocations(numberOfLocations: number) {
@@ -42,5 +68,5 @@ async function deleteLocations(numberOfLocations: number) {
   }
 }
 
-const numberOfLocations = parseInt(process.argv[2], 10) || 1;
-deleteLocations(numberOfLocations); 
+// Start deleting locations
+deleteLocations(argv.count); 
