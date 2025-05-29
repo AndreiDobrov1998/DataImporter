@@ -160,6 +160,51 @@ npx ts-node src/scripts/manage-taxes.ts create
 npx ts-node src/scripts/manage-taxes.ts list --access-token "your_token_here"
 ```
 
+## Terminal UI for Running Scripts
+
+You can now run any script from `src/scripts/` using an interactive terminal UI powered by Enquirer.
+
+### How to Use
+
+1. **Start the TUI:**
+   ```sh
+   npx ts-node scripts/tui.ts
+   ```
+2. **Select a script** from the list.
+3. The script's `--help` output will be shown for reference.
+4. **Enter parameters** as CLI flags (comma separated), for example:
+   ```
+   --access-token=YOUR_TOKEN, --min-quantity=2, --max-quantity=5
+   ```
+   - Use double dashes (`--`) for flags, just like you would on the command line.
+   - You can leave it blank if no parameters are needed.
+5. The script will run and output will be shown in the terminal.
+
+### Example
+
+```
+? Select a script to run · order-data-generator.ts
+
+--- Script Help ---
+Options:
+      --version              Show version number                       [boolean]
+      --min-quantity, --min  Minimum quantity per order    [number] [default: 1]
+      --max-quantity, --max  Maximum quantity per order    [number] [default: 3]
+  -c, --concurrency          Number of concurrent orders to process
+                                                          [number] [default: 10]
+  -t, --access-token         Square API access token (overrides .env AUTH_TOKEN)
+                                                                        [string]
+      --help                 Show help                                 [boolean]
+-------------------
+? Enter parameters as key=value pairs (comma separated), or leave blank: · --access-token=YOUR_TOKEN, --min-quantity=2
+```
+
+**Note:**
+- You can also set environment variables (like `AUTH_TOKEN`) when running the TUI:
+  ```sh
+  AUTH_TOKEN=your_token npx ts-node scripts/tui.ts
+  ```
+
 ## Performance Optimization
 
 The order generation script (`order-data-generator.ts`) has been optimized for high performance:
