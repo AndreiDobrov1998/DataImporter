@@ -175,6 +175,63 @@ Example of high-performance order generation:
 npx ts-node src/scripts/order-data-generator.ts --min-quantity 2 --max-quantity 5 --concurrency 10
 ```
 
+## Token Management
+
+The project includes a flexible token management script (`run-all-tokens.sh`) that allows you to process orders with multiple Square API tokens sequentially.
+
+### Features
+- Process multiple tokens in sequence
+- Configurable order parameters
+- Clear progress tracking
+- Easy token management
+
+### Usage
+
+1. Make the script executable:
+```bash
+chmod +x run-all-tokens.sh
+```
+
+2. Edit the script to add your tokens:
+```bash
+# Array of tokens
+tokens=(
+    "your_first_token_here"
+    "your_second_token_here"
+    "your_third_token_here"
+)
+```
+
+3. Configure the parameters (optional):
+```bash
+# Default parameters
+MIN_QUANTITY=2
+MAX_QUANTITY=5
+CONCURRENCY=10
+```
+
+4. Run the script:
+```bash
+./run-all-tokens.sh
+```
+
+### Example Output
+```
+Starting order generation with 3 tokens...
+Parameters: min-quantity=2, max-quantity=5, concurrency=10
+----------------------------------------
+Running with token 1...
+[Order generation output]
+----------------------------------------
+Running with token 2...
+[Order generation output]
+----------------------------------------
+Running with token 3...
+[Order generation output]
+----------------------------------------
+All tokens processed!
+```
+
 ## Error Handling
 
 All scripts include comprehensive error handling:
