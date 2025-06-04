@@ -48,6 +48,24 @@ const argv = yargs(hideBin(process.argv))
         description: 'Number of modifiers per group',
         default: 5
     })
+    .option('combos', {
+        alias: 'b',
+        type: 'number',
+        description: 'Number of combos to create',
+        default: 0
+    })
+    .option('items-per-combo', {
+        alias: 'p',
+        type: 'number',
+        description: 'Number of items per combo',
+        default: 3
+    })
+    .option('combo-price', {
+        alias: 'r',
+        type: 'number',
+        description: 'Base price for combos in cents',
+        default: 1999
+    })
     .option('access-token', {
         alias: 't',
         type: 'string',
@@ -78,7 +96,45 @@ async function importCatalog() {
             }
         }));
 
-        // Generate multiple modifier groups
+        // Add Combos category
+        categories.push({
+            type: 'CATEGORY',
+            id: '#CombosCategory',
+            presentAtAllLocations: true,
+            categoryData: {
+                name: 'Combos'
+            }
+        });
+
+        // First batch: categories only
+        console.log('Importing categories...');
+        const categoryBatch = categories.map(cat => ({
+            type: 'CATEGORY',
+            id: cat.id,
+            presentAtAllLocations: true,
+            categoryData: {
+                name: cat.categoryData.name
+            }
+        }));
+        
+        const categoryResponse = await catalogClient.batchUpsertItemObjects([{ objects: categoryBatch }]);
+        console.log('Categories imported successfully!');
+
+        // Map client category IDs to real Square IDs
+        const categoryIdMap: Record<string, string> = {};
+        if (categoryResponse.idMappings) {
+            for (const cat of categories) {
+                const mapping = categoryResponse.idMappings.find(m => m.clientObjectId === cat.id);
+                if (mapping && mapping.objectId) {
+                    categoryIdMap[cat.id] = mapping.objectId;
+                } else {
+                    console.error(`Failed to map category ID for ${cat.id}`);
+                    process.exit(1);
+                }
+            }
+        }
+
+        // Generate modifier groups
         const modifierGroups = Array.from({ length: argv['modifier-groups'] }, (_, groupIndex) => {
             const modifiers = Array.from({ length: argv['modifiers-per-group'] }, (_, i) => ({
                 type: 'MODIFIER',
@@ -104,34 +160,21 @@ async function importCatalog() {
             };
         });
 
-        // First batch: categories and modifier lists
-        console.log('Importing categories and modifier lists...');
-        const firstBatch = [...categories, ...modifierGroups];
-        const firstBatchResponse = await catalogClient.batchUpsertItemObjects([{ objects: firstBatch }]);
-        console.log('Categories and modifier lists imported successfully!');
+        // Import modifier groups
+        console.log('Importing modifier groups...');
+        const modifierResponse = await catalogClient.batchUpsertItemObjects([{ objects: modifierGroups }]);
+        console.log('Modifier groups imported successfully!');
 
         // Extract the real Square object IDs for the modifier lists
         const modifierListIdMap: Record<string, string> = {};
-        if (firstBatchResponse.idMappings) {
+        if (modifierResponse.idMappings) {
             for (const group of modifierGroups) {
-                const mapping = firstBatchResponse.idMappings.find(m => m.clientObjectId === group.id);
+                const mapping = modifierResponse.idMappings.find(m => m.clientObjectId === group.id);
                 if (mapping && mapping.objectId) {
                     modifierListIdMap[group.id] = mapping.objectId;
                 } else {
-                    modifierListIdMap[group.id] = group.id; // fallback
-                }
-            }
-        }
-
-        // Map client category IDs to real Square IDs
-        const categoryIdMap: Record<string, string> = {};
-        if (firstBatchResponse.idMappings) {
-            for (const cat of categories) {
-                const mapping = firstBatchResponse.idMappings.find(m => m.clientObjectId === cat.id);
-                if (mapping && mapping.objectId) {
-                    categoryIdMap[cat.id] = mapping.objectId;
-                } else {
-                    categoryIdMap[cat.id] = cat.id; // fallback
+                    console.error(`Failed to map modifier list ID for ${group.id}`);
+                    process.exit(1);
                 }
             }
         }
@@ -141,14 +184,19 @@ async function importCatalog() {
         const allItems: CatalogObject[] = [];
         let globalItemCounter = 1;
         
-        for (let categoryIndex = 0; categoryIndex < categories.length; categoryIndex++) {
-            const clientCategoryId = `#Category${categoryIndex + 1}`;
-            const realCategoryId = categoryIdMap[clientCategoryId] || clientCategoryId;
+        // Only use the original categories for regular items (exclude Combos category)
+        const regularCategoryIds = categories
+            .filter(cat => cat.id !== '#CombosCategory')
+            .map(cat => cat.id);
+
+        for (let categoryIndex = 0; categoryIndex < regularCategoryIds.length; categoryIndex++) {
+            const clientCategoryId = regularCategoryIds[categoryIndex];
+            const realCategoryId = categoryIdMap[clientCategoryId];
             for (let itemIndex = 0; itemIndex < itemsPerCategory; itemIndex++) {
                 // Assign a random modifier list to each item
                 const randomModifierListIndex = Math.floor(Math.random() * modifierGroups.length);
                 const clientModifierListId = `#ModifierList${randomModifierListIndex + 1}`;
-                const realModifierListId = modifierListIdMap[clientModifierListId] || clientModifierListId;
+                const realModifierListId = modifierListIdMap[clientModifierListId];
 
                 // Determine if this item should have variations
                 const hasVariations = itemIndex < argv['items-with-variations'];
@@ -188,6 +236,7 @@ async function importCatalog() {
                     presentAtAllLocations: true,
                     itemData: {
                         name: `Item SQ-${String(globalItemCounter).padStart(4, '0')}${hasVariations ? ' (with variations)' : ''}`,
+                        productType: 'REGULAR',
                         categories: [{ id: realCategoryId }],
                         modifierListInfo: [{
                             modifierListId: realModifierListId,
@@ -216,6 +265,83 @@ async function importCatalog() {
             // Add a small delay between batches to avoid rate limiting
             if (i + batchSize < allItems.length) {
                 await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        }
+
+        // After importing all regular items, create combos if requested
+        if (argv.combos > 0) {
+            console.log(`Creating ${argv.combos} combos...`);
+            // Get all regular items for combo slots
+            const allItemsRaw = await catalogClient.getAllCatalogItems(['ITEM']);
+            const regularItems = allItemsRaw.filter((item: CatalogObject) => 
+                item.itemData?.productType === 'REGULAR' && 
+                Array.isArray(item.itemData?.categories) && 
+                item.itemData.categories.some((cat: { id?: string }) => 
+                    typeof cat.id === 'string' && 
+                    cat.id !== categoryIdMap['#CombosCategory']
+                )
+            );
+
+            if (regularItems.length < argv['items-per-combo']) {
+                console.error(`Not enough regular items in catalog for combos. Required: ${argv['items-per-combo']}, Available: ${regularItems.length}`);
+                process.exit(1);
+            }
+
+            const combos: CatalogObject[] = [];
+            for (let i = 0; i < argv.combos; i++) {
+                const comboId = `#Combo${i + 1}`;
+                // Pick unique items for each combo
+                const comboItems = regularItems.slice(i * argv['items-per-combo'], (i + 1) * argv['items-per-combo']);
+                
+                // Create the combo item with slots
+                combos.push({
+                    type: 'ITEM',
+                    id: comboId,
+                    presentAtAllLocations: true,
+                    itemData: {
+                        name: `Combo SQ-${String(i + 1).padStart(4, '0')}`,
+                        description: `Combo package with ${argv['items-per-combo']} items`,
+                        productType: 'COMBO',
+                        skipModifierScreen: true,
+                        categories: [{ id: categoryIdMap['#CombosCategory'] }],
+                        variations: [{
+                            type: 'ITEM_VARIATION',
+                            id: `#ComboVariation${i + 1}`,
+                            presentAtAllLocations: true,
+                            itemVariationData: {
+                                itemId: comboId,
+                                name: 'Regular',
+                                pricingType: 'FIXED_PRICING',
+                                priceMoney: {
+                                    amount: BigInt(argv['combo-price']),
+                                    currency: 'USD'
+                                }
+                            }
+                        }],
+                        comboTypeDetails: {
+                            slots: comboItems.map((item, index) => ({
+                                uid: `#ComboSlot${i + 1}_${index + 1}`,
+                                numSelections: 1,
+                                itemId: item.id,
+                                itemIds: [item.id],
+                                defaultItemVariationId: item.itemData?.variations?.[0]?.id
+                            }))
+                        }
+                    }
+                });
+            }
+
+            // Import combos in batches
+            const comboBatchSize = 500;
+            for (let i = 0; i < combos.length; i += comboBatchSize) {
+                const batchNumber = Math.floor(i / comboBatchSize) + 1;
+                console.log(`Importing combo batch ${batchNumber}...`);
+                const batch = combos.slice(i, i + comboBatchSize);
+                await catalogClient.batchUpsertItemObjects([{ objects: batch }]);
+                console.log(`Combo batch ${batchNumber} imported successfully!`);
+                if (i + comboBatchSize < combos.length) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
             }
         }
 

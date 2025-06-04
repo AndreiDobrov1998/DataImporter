@@ -64,10 +64,29 @@ async function deleteAllModifiers(catalogClient: SquareManager) {
 async function deleteAllCatalogObjects(catalogClient: SquareManager) {
     console.log('Deleting all catalog objects...');
     await deleteAllModifiers(catalogClient);
-    let listed: string[] = [];
+
+    // Explicitly delete combo items first
+    const catalog = await catalogClient.listCatalog();
+    const objects = catalog.objects || [];
+    const comboItems = objects.filter(obj => obj.type === 'ITEM' && obj.itemData?.productType === 'COMBO');
+    const comboItemIds = comboItems.map(item => item.id);
     let totalDeleted = 0;
+    if (comboItemIds.length > 0) {
+        console.log(`Deleting ${comboItemIds.length} combo items...`);
+        for (let i = 0; i < comboItemIds.length; i += 1000) {
+            const batch = comboItemIds.slice(i, i + 1000);
+            await safeBatchDelete(catalogClient, batch);
+            totalDeleted += batch.length;
+            console.log(`Total combo items deleted so far: ${totalDeleted}`);
+        }
+    }
+
+    // Now delete the rest (ITEM, CATEGORY, DISCOUNT)
+    let listed: string[] = [];
     do {
         listed = await catalogClient.listCatalogIds(['ITEM', 'CATEGORY', 'DISCOUNT']);
+        // Remove combo item IDs from the list if present
+        listed = listed.filter(id => !comboItemIds.includes(id));
         if (listed.length > 0) {
             for (let i = 0; i < listed.length; i += 1000) {
                 const batch = listed.slice(i, i + 1000);

@@ -67,7 +67,8 @@ export class SquareManager extends SquareBaseClient {
         super(accessToken);
         this.client = new Client({
             accessToken: accessToken || process.env.AUTH_TOKEN,
-            environment: Environment.Production
+            environment: Environment.Production,
+            squareVersion: '2025-05-21'
         });
         this.catalogApi = this.client.catalogApi;
         this.ordersApi = this.client.ordersApi;
