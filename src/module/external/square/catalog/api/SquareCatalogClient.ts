@@ -154,6 +154,7 @@ export class SquareManager extends SquareBaseClient {
         lineItems: Array<{
             catalogObjectId: string;
             quantity: string;
+            catalogVersion?: bigint;
         }>,
         applyTax: boolean = true
     ): Promise<Order> {
@@ -163,6 +164,7 @@ export class SquareManager extends SquareBaseClient {
                 lineItems: lineItems.map(item => ({
                     quantity: item.quantity,
                     catalogObjectId: item.catalogObjectId,
+                    catalogVersion: item.catalogVersion,
                     appliedTaxes: []
                 })),
                 fulfillments: [{

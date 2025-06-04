@@ -112,7 +112,7 @@ npx ts-node src/scripts/import-catalog-with-images.ts --access-token "your_token
 
 ### Generate Orders
 
-Generates orders with random quantities for each catalog item variation.
+Generates orders with random quantities for each catalog item variation. The script now skips combo items and handles version checking more efficiently.
 
 ```bash
 npx ts-node src/scripts/order-data-generator.ts --min-quantity 2 --max-quantity 5 --concurrency 10
@@ -132,6 +132,43 @@ npx ts-node src/scripts/order-data-generator.ts --min-quantity 2 --max-quantity 
 # Generate orders with custom parameters and access token
 npx ts-node src/scripts/order-data-generator.ts --min-quantity 1 --max-quantity 10 --concurrency 20 --access-token "your_token_here"
 ```
+
+### Workday Simulator
+
+A comprehensive tool for simulating a day's worth of catalog and order operations. The simulator provides an interactive interface to perform various operations on your Square catalog and generate orders.
+
+```bash
+npm start
+```
+
+The simulator offers the following operations:
+
+1. **Edit Item Prices**: Randomly updates prices for selected items
+2. **Edit Item Titles**: Updates item names with new generated titles
+3. **Add Item Variations**: Adds new variations to existing items
+4. **Remove Item Variations**: Removes random variations from items
+5. **Assign Categories and Modifiers**: Assigns random categories and modifiers to items
+6. **Run Order Generator**: Generates orders with configurable parameters
+
+Configuration options:
+- `--access-token` or `-t`: Square API access token (overrides .env AUTH_TOKEN)
+
+Example:
+```bash
+# Run simulator using .env AUTH_TOKEN
+npm start
+
+# Run simulator with custom access token
+npm start -- --access-token "your_token_here"
+```
+
+Features:
+- Interactive menu-driven interface
+- Configurable number of items to process
+- Automatic order generation with payment processing
+- Error handling and retry mechanisms
+- Detailed operation summaries
+- Concurrent order processing
 
 ### Manage Taxes
 

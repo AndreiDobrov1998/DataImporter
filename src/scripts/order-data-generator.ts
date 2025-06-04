@@ -4,6 +4,8 @@ import * as dotenv from 'dotenv';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import pLimit from 'p-limit';
+import { Client } from 'square';
+import crypto from 'crypto';
 
 // Load environment variables
 dotenv.config();
@@ -34,7 +36,7 @@ const argv = yargs(hideBin(process.argv))
         description: 'Square API access token (overrides .env AUTH_TOKEN)'
     })
     .help()
-    .argv as any;
+    .argv as { [key: string]: unknown; 'min-quantity': number; 'max-quantity': number; concurrency: number; 'access-token'?: string };
 
 // Get access token from command line or environment
 const accessToken = argv['access-token'] || process.env.AUTH_TOKEN;
@@ -48,108 +50,223 @@ const MIN_QUANTITY = argv['min-quantity'];
 const MAX_QUANTITY = argv['max-quantity'];
 const CONCURRENCY = argv.concurrency;
 
-interface OrderCreationResult {
-    orderId: string;
-    paymentId: string;
-    quantity: number;
-    itemId: string;
-    variationId: string;
+interface CatalogVariation {
+    id?: string;
+    type?: string;
+    updatedAt?: string;
+    version?: number;
+    isDeleted?: boolean;
+    presentAtAllLocations?: boolean;
+    itemVariationData?: {
+        itemId?: string;
+        name?: string;
+        sku?: string;
+        pricingType?: string;
+        priceMoney?: {
+            amount?: number;
+            currency?: string;
+        };
+    };
+}
+
+async function verifyCatalogObject(client: Client, objectId: string): Promise<{ exists: boolean }> {
+    try {
+        const response = await client.catalogApi.retrieveCatalogObject(objectId);
+        const object = response.result.object;
+        return { exists: !!object };
+    } catch (error) {
+        console.error(`Error verifying catalog object ${objectId}:`, error);
+        return { exists: false };
+    }
 }
 
 async function createOrderWithPayment(
+    client: Client,
+    locationId: string,
     variationId: string,
     itemId: string,
-    catalogClient: SquareManager
-): Promise<OrderCreationResult | null> {
+    quantity: number
+): Promise<void> {
     try {
-        const quantity = faker.number.int({ min: MIN_QUANTITY, max: MAX_QUANTITY });
-        const location = catalogClient.getRandomLocation();
-        
-        if (!location.id) {
-            console.error('No location ID found, skipping order creation.');
-            return null;
+        const verification = await verifyCatalogObject(client, variationId);
+        if (!verification.exists) {
+            console.log(`Skipping order creation for non-existent variation ${variationId}`);
+            return;
         }
-
-        const order = await catalogClient.createOrder(
-            location.id,
-            [{ catalogObjectId: variationId, quantity: quantity.toString() }]
-        );
-
-        if (!order.id) {
-            console.error(`Order ID is undefined for variation ${variationId} of item ${itemId}.`);
-            return null;
-        }
-
-        const payment = await catalogClient.createPayment(order.id, 'CASH', location.id);
-        console.log(`Created order ${order.id} with payment ${payment.id} (${quantity} items)`);
-
-        return {
+        console.log(`Creating order for variation ${variationId} (item ${itemId}) with quantity ${quantity}`);
+        const orderResponse = await client.ordersApi.createOrder({
+            order: {
+                locationId,
+                lineItems: [
+                    {
+                        quantity: quantity.toString(),
+                        catalogObjectId: variationId,
+                        appliedTaxes: []
+                    }
+                ],
+                fulfillments: [
+                    {
+                        type: 'PICKUP',
+                        pickupDetails: {
+                            recipient: {
+                                displayName: faker.person.fullName()
+                            },
+                            pickupAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+                        }
+                    }
+                ]
+            },
+            idempotencyKey: crypto.randomUUID()
+        });
+        const order = orderResponse.result.order;
+        if (!order) throw new Error('No order returned from API');
+        console.log(`Creating payment for order ID: ${order.id}`);
+        const paymentResponse = await client.paymentsApi.createPayment({
+            sourceId: 'CASH',
+            amountMoney: {
+                amount: BigInt(order.totalMoney?.amount || 0),
+                currency: 'USD'
+            },
+            locationId,
             orderId: order.id,
-            paymentId: payment.id,
-            quantity,
-            itemId,
-            variationId
-        };
-    } catch (error) {
-        console.error(`Error processing variation ${variationId} of item ${itemId}:`, error);
-        return null;
+            idempotencyKey: crypto.randomUUID(),
+            cashDetails: {
+                buyerSuppliedMoney: {
+                    amount: BigInt(order.totalMoney?.amount || 0),
+                    currency: 'USD'
+                }
+            }
+        });
+        const payment = paymentResponse.result.payment;
+        if (!payment) throw new Error('No payment returned from API');
+        console.log(`Payment created successfully for order ID: ${order.id}, Payment ID: ${payment.id}, Amount: ${payment.amountMoney?.amount} ${payment.amountMoney?.currency}`);
+        console.log(`                           Created order ${order.id} with payment ${payment.id} (${quantity} items)`);
+    } catch (error: unknown) {
+        if (typeof error === 'object' && error && 'statusCode' in error && (error as any).statusCode === 404 && (error as any).errors?.[0]?.code === 'NOT_FOUND') {
+            try {
+                console.log(`Retrying order creation for variation ${variationId} without version information`);
+                const orderResponse = await client.ordersApi.createOrder({
+                    order: {
+                        locationId,
+                        lineItems: [
+                            {
+                                quantity: quantity.toString(),
+                                catalogObjectId: variationId,
+                                appliedTaxes: []
+                            }
+                        ],
+                        fulfillments: [
+                            {
+                                type: 'PICKUP',
+                                pickupDetails: {
+                                    recipient: {
+                                        displayName: faker.person.fullName()
+                                    },
+                                    pickupAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+                                }
+                            }
+                        ]
+                    },
+                    idempotencyKey: crypto.randomUUID()
+                });
+                const order = orderResponse.result.order;
+                if (!order) throw new Error('No order returned from API');
+                console.log(`Creating payment for order ID: ${order.id}`);
+                const paymentResponse = await client.paymentsApi.createPayment({
+                    sourceId: 'CASH',
+                    amountMoney: {
+                        amount: BigInt(order.totalMoney?.amount || 0),
+                        currency: 'USD'
+                    },
+                    locationId,
+                    orderId: order.id,
+                    idempotencyKey: crypto.randomUUID(),
+                    cashDetails: {
+                        buyerSuppliedMoney: {
+                            amount: BigInt(order.totalMoney?.amount || 0),
+                            currency: 'USD'
+                        }
+                    }
+                });
+                const payment = paymentResponse.result.payment;
+                if (!payment) throw new Error('No payment returned from API');
+                console.log(`Payment created successfully for order ID: ${order.id}, Payment ID: ${payment.id}, Amount: ${payment.amountMoney?.amount} ${payment.amountMoney?.currency}`);
+                console.log(`                           Created order ${order.id} with payment ${payment.id} (${quantity} items)`);
+                return;
+            } catch (retryError) {
+                console.error(`Error creating order for variation ${variationId} of item ${itemId}:`);
+                console.error('Detailed error:', JSON.stringify((retryError as any).errors || retryError, null, 2));
+                return;
+            }
+        }
+        console.error(`Error creating order for variation ${variationId} of item ${itemId}:`);
+        console.error('Detailed error:', JSON.stringify((error as any).errors || error, null, 2));
     }
 }
 
 async function processCatalogItems(catalogClient: SquareManager): Promise<void> {
     try {
-        // Initialize locations
         await catalogClient.initializeLocations();
-        
-        // Get all catalog items and their variations
         const catalogItems = await catalogClient.getAllCatalogItems(['ITEM']);
         console.log(`Found ${catalogItems.length} items in the catalog.`);
-        
-        const results: OrderCreationResult[] = [];
         let skippedItems = 0;
-        
-        // Create a list of all variations to process
+        let invalidVariations = 0;
+        let skippedCombos = 0;
         const variationsToProcess: { variationId: string; itemId: string }[] = [];
-        
+        const verifyLimit = pLimit(CONCURRENCY);
         for (const item of catalogItems) {
+            if (item.itemData?.type === 'COMBO') {
+                console.log(`Skipping combo item ${item.id}`);
+                skippedCombos++;
+                continue;
+            }
             if (!item.itemData?.variations || item.itemData.variations.length === 0) {
                 skippedItems++;
                 continue;
             }
-
-            for (const variation of item.itemData.variations) {
+            const verificationPromises = item.itemData.variations.map(async (variation: CatalogVariation) => {
                 if (!variation.id) {
                     skippedItems++;
-                    continue;
+                    return null;
                 }
-                variationsToProcess.push({
-                    variationId: variation.id,
+                const variationId = variation.id;
+                const exists = await verifyLimit(() => verifyCatalogObject(catalogClient.client, variationId));
+                if (!exists) {
+                    console.log(`Skipping variation ${variationId} of item ${item.id} - catalog object not found`);
+                    invalidVariations++;
+                    return null;
+                }
+                return {
+                    variationId,
                     itemId: item.id
-                });
-            }
+                };
+            });
+            const verifiedVariations = await Promise.all(verificationPromises);
+            variationsToProcess.push(...verifiedVariations.filter((v): v is { variationId: string; itemId: string } => v !== null));
         }
-
-        console.log(`Processing ${variationsToProcess.length} variations with concurrency ${CONCURRENCY}`);
-
-        // Create a rate limiter with fixed concurrency
-        const limit = pLimit(CONCURRENCY);
-
-        // Process all variations concurrently with rate limiting
-        const promises = variationsToProcess.map(({ variationId, itemId }) => 
-            limit(() => createOrderWithPayment(variationId, itemId, catalogClient))
-        );
-
-        // Wait for all promises to resolve
-        const batchResults = await Promise.all(promises);
-        
-        // Filter out null results and add to results array
-        results.push(...batchResults.filter((result): result is OrderCreationResult => result !== null));
-
-        // Log summary
+        console.log(`Processing ${variationsToProcess.length} valid variations with concurrency ${CONCURRENCY}`);
+        const orderLimit = pLimit(CONCURRENCY);
+        const promises = variationsToProcess.map(({ variationId, itemId }) => {
+            const location = catalogClient.getRandomLocation();
+            const locationId = location.id;
+            if (!locationId) {
+                console.error('No location ID found, skipping order creation.');
+                return Promise.resolve();
+            }
+            return orderLimit(() => createOrderWithPayment(
+                catalogClient.client,
+                locationId,
+                variationId,
+                itemId,
+                faker.number.int({ min: MIN_QUANTITY, max: MAX_QUANTITY })
+            ));
+        });
+        await Promise.all(promises);
         console.log('\nOrder Generation Summary:');
-        console.log(`Total orders created: ${results.length}`);
         console.log(`Total items processed: ${catalogItems.length}`);
         console.log(`Items skipped: ${skippedItems}`);
+        console.log(`Invalid variations: ${invalidVariations}`);
+        console.log(`Combo items skipped: ${skippedCombos}`);
         console.log(`Concurrency level: ${CONCURRENCY}`);
     } catch (error) {
         console.error('Fatal error:', error);
