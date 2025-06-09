@@ -324,7 +324,9 @@ async function importCatalog() {
                                 numSelections: 1,
                                 itemId: item.id,
                                 itemIds: [item.id],
-                                defaultItemVariationId: item.itemData?.variations?.[0]?.id
+                                defaultItemVariationId: item.itemData?.variations?.[0]?.id,
+                                attributeName: `Slot ${index + 1}`,
+                                name: `Slot ${index + 1}`
                             }))
                         }
                     }
@@ -346,25 +348,6 @@ async function importCatalog() {
         }
 
         console.log('Catalog import completed successfully!');
-
-        // Verify that each item is assigned to a valid category
-        console.log('Verifying catalog...');
-        const response = await catalogClient.listCatalog();
-        const objects = response.objects || [];
-        const categoryIds = objects.filter(obj => obj.type === 'CATEGORY').map(obj => obj.id);
-        const items = objects.filter(obj => obj.type === 'ITEM');
-        let validItems = 0;
-        let invalidItems = 0;
-        for (const item of items) {
-            const categoryId = item.itemData?.categories?.[0]?.id;
-            if (categoryId && categoryIds.includes(categoryId)) {
-                validItems++;
-            } else {
-                invalidItems++;
-                console.log(`Item ${item.id} (${item.itemData?.name}) has invalid categoryId: ${categoryId}`);
-            }
-        }
-        console.log(`Verification complete. Valid items: ${validItems}, Invalid items: ${invalidItems}`);
     } catch (error) {
         console.error('Error importing catalog:', error);
         process.exit(1);

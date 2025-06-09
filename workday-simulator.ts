@@ -28,153 +28,220 @@ const catalogClient = new SquareManager(accessToken);
 
 async function getRandomItems(count: number): Promise<CatalogObject[]> {
     const items = await catalogClient.getAllCatalogItems(['ITEM']);
-    return faker.helpers.arrayElements(items, count);
+    if (items.length === 0) {
+        throw new Error('No items found in catalog');
+    }
+    if (count > items.length) {
+        console.log(`Warning: Requested ${count} items but only ${items.length} available. Using all available items.`);
+        count = items.length;
+    }
+    // Shuffle array and take first 'count' items
+    const shuffled = items.sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, count);
 }
 
 async function editItemPrices(count: number) {
-    const items = await getRandomItems(count);
-    console.log(`\nEditing prices for ${count} items...`);
-    for (const item of items) {
-        if (!item.itemData?.variations) continue;
-        for (const variation of item.itemData.variations) {
-            if (!variation.id) continue;
-            const newPrice = faker.number.int({ min: 100, max: 5000 });
-            const updatedVariation: CatalogObject = {
+    let updatedCount = 0;
+    let attempts = 0;
+    const maxAttempts = count * 2; // Allow some extra attempts to account for skipped items
+
+    while (updatedCount < count && attempts < maxAttempts) {
+        const items = await getRandomItems(count - updatedCount);
+        console.log(`\nEditing prices for ${count - updatedCount} items...`);
+        for (const item of items) {
+            if (!item.itemData?.variations) continue;
+            let itemUpdated = false;
+            for (const variation of item.itemData.variations) {
+                if (!variation.id) continue;
+                const newPrice = faker.number.int({ min: 100, max: 5000 });
+                const updatedVariation: CatalogObject = {
+                    type: 'ITEM_VARIATION',
+                    id: variation.id,
+                    version: variation.version,
+                    itemVariationData: {
+                        ...variation.itemVariationData,
+                        priceMoney: {
+                            amount: BigInt(newPrice),
+                            currency: 'USD'
+                        }
+                    }
+                };
+                await catalogClient.batchUpsertItemObjects([{ objects: [updatedVariation] }]);
+                console.log(`Updated price for ${item.itemData.name} - ${variation.itemVariationData?.name} to $${newPrice/100}`);
+                itemUpdated = true;
+            }
+            if (itemUpdated) updatedCount++;
+        }
+        attempts++;
+    }
+    console.log(`\nSuccessfully updated prices for ${updatedCount} items`);
+}
+
+async function editItemTitles(count: number) {
+    let updatedCount = 0;
+    let attempts = 0;
+    const maxAttempts = count * 2;
+
+    while (updatedCount < count && attempts < maxAttempts) {
+        const items = await getRandomItems(count - updatedCount);
+        console.log(`\nEditing titles for ${count - updatedCount} items...`);
+        for (const item of items) {
+            if (!item.id || !item.itemData) continue;
+            if ((item.itemData as any).productType === 'COMBO') {
+                console.log(`Skipping COMBO item: ${item.itemData.name}`);
+                continue;
+            }
+            const newName = `Updated ${faker.commerce.productName()}`;
+            const updatedItem: CatalogObject = {
+                type: 'ITEM',
+                id: item.id,
+                version: item.version,
+                itemData: {
+                    ...(item.itemData as any),
+                    name: newName,
+                    comboTypeDetails: (item.itemData as any).productType === 'COMBO' ? (item.itemData as any).comboTypeDetails : undefined
+                }
+            };
+            await catalogClient.batchUpsertItemObjects([{ objects: [updatedItem] }]);
+            console.log(`Updated name for item to: ${newName}`);
+            updatedCount++;
+        }
+        attempts++;
+    }
+    console.log(`\nSuccessfully updated titles for ${updatedCount} items`);
+}
+
+async function addItemVariations(count: number) {
+    let updatedCount = 0;
+    let attempts = 0;
+    const maxAttempts = count * 2;
+
+    while (updatedCount < count && attempts < maxAttempts) {
+        const items = await getRandomItems(count - updatedCount);
+        console.log(`\nAdding variations to ${count - updatedCount} items...`);
+        for (const item of items) {
+            if (!item.id || !item.itemData) continue;
+            if ((item.itemData as any).productType === 'COMBO') {
+                console.log(`Skipping COMBO item: ${item.itemData.name}`);
+                continue;
+            }
+            const variationName = `New Variation ${faker.commerce.productAdjective()}`;
+            const price = faker.number.int({ min: 100, max: 5000 });
+            const newVariation: CatalogObject = {
                 type: 'ITEM_VARIATION',
-                id: variation.id,
-                version: variation.version,
+                id: `#${crypto.randomUUID()}`,
                 itemVariationData: {
-                    ...variation.itemVariationData,
+                    name: variationName,
                     priceMoney: {
-                        amount: BigInt(newPrice),
+                        amount: BigInt(price),
                         currency: 'USD'
                     }
                 }
             };
-            await catalogClient.batchUpsertItemObjects([{ objects: [updatedVariation] }]);
-            console.log(`Updated price for ${item.itemData.name} - ${variation.itemVariationData?.name} to $${newPrice/100}`);
-        }
-    }
-}
-
-async function editItemTitles(count: number) {
-    const items = await getRandomItems(count);
-    console.log(`\nEditing titles for ${count} items...`);
-    for (const item of items) {
-        if (!item.id || !item.itemData) continue;
-        if ((item.itemData as any).productType === 'COMBO') {
-            console.log(`Skipping COMBO item: ${item.itemData.name}`);
-            continue;
-        }
-        const newName = `Updated ${faker.commerce.productName()}`;
-        const updatedItem: CatalogObject = {
-            type: 'ITEM',
-            id: item.id,
-            version: item.version,
-            itemData: {
-                ...(item.itemData as any),
-                name: newName,
-                comboTypeDetails: (item.itemData as any).productType === 'COMBO' ? (item.itemData as any).comboTypeDetails : undefined
-            }
-        };
-        await catalogClient.batchUpsertItemObjects([{ objects: [updatedItem] }]);
-        console.log(`Updated name for item to: ${newName}`);
-    }
-}
-
-async function addItemVariations(count: number) {
-    const items = await getRandomItems(count);
-    console.log(`\nAdding variations to ${count} items...`);
-    for (const item of items) {
-        if (!item.id || !item.itemData) continue;
-        if ((item.itemData as any).productType === 'COMBO') {
-            console.log(`Skipping COMBO item: ${item.itemData.name}`);
-            continue;
-        }
-        const variationName = `New Variation ${faker.commerce.productAdjective()}`;
-        const price = faker.number.int({ min: 100, max: 5000 });
-        const newVariation: CatalogObject = {
-            type: 'ITEM_VARIATION',
-            id: `#${crypto.randomUUID()}`,
-            itemVariationData: {
-                name: variationName,
-                priceMoney: {
-                    amount: BigInt(price),
-                    currency: 'USD'
+            const updatedItem: CatalogObject = {
+                type: 'ITEM',
+                id: item.id,
+                version: item.version,
+                itemData: {
+                    ...(item.itemData as any),
+                    variations: [...(item.itemData.variations || []), newVariation],
+                    comboTypeDetails: (item.itemData as any).productType === 'COMBO' ? (item.itemData as any).comboTypeDetails : undefined
                 }
-            }
-        };
-        const updatedItem: CatalogObject = {
-            type: 'ITEM',
-            id: item.id,
-            version: item.version,
-            itemData: {
-                ...(item.itemData as any),
-                variations: [...(item.itemData.variations || []), newVariation],
-                comboTypeDetails: (item.itemData as any).productType === 'COMBO' ? (item.itemData as any).comboTypeDetails : undefined
-            }
-        };
-        await catalogClient.batchUpsertItemObjects([{ objects: [updatedItem] }]);
-        console.log(`Added variation "${variationName}" to ${item.itemData.name}`);
+            };
+            await catalogClient.batchUpsertItemObjects([{ objects: [updatedItem] }]);
+            console.log(`Added variation "${variationName}" to ${item.itemData.name}`);
+            updatedCount++;
+        }
+        attempts++;
     }
+    console.log(`\nSuccessfully added variations to ${updatedCount} items`);
 }
 
 async function removeItemVariations(count: number) {
-    const items = await getRandomItems(count);
-    console.log(`\nRemoving variations from ${count} items...`);
-    for (const item of items) {
-        if (!item.itemData?.variations || item.itemData.variations.length <= 1) continue;
-        const variationToRemove = faker.helpers.arrayElement(item.itemData.variations);
-        if (!variationToRemove.id) continue;
-        await catalogClient.batchDeleteCatalogObjects([variationToRemove.id]);
-        console.log(`Removed variation from ${item.itemData.name}`);
+    let updatedCount = 0;
+    let attempts = 0;
+    const maxAttempts = count * 2;
+
+    while (updatedCount < count && attempts < maxAttempts) {
+        const items = await getRandomItems(count - updatedCount);
+        console.log(`\nRemoving variations from ${count - updatedCount} items...`);
+        for (const item of items) {
+            if (!item.itemData?.variations || item.itemData.variations.length <= 1) continue;
+            const variationToRemove = faker.helpers.arrayElement(item.itemData.variations);
+            if (!variationToRemove.id) continue;
+            await catalogClient.batchDeleteCatalogObjects([variationToRemove.id]);
+            console.log(`Removed variation from ${item.itemData.name}`);
+            updatedCount++;
+        }
+        attempts++;
     }
+    console.log(`\nSuccessfully removed variations from ${updatedCount} items`);
 }
 
 async function assignCategoriesAndModifiers(count: number) {
-    const items = await getRandomItems(count);
+    let updatedCount = 0;
+    let attempts = 0;
+    const maxAttempts = count * 2;
     const categories = await catalogClient.getAllCatalogItems(['CATEGORY']);
     const modifierLists = await catalogClient.getAllCatalogItems(['MODIFIER_LIST']);
-    console.log(`\nAssigning categories and modifiers to ${count} items...`);
-    for (const item of items) {
-        if (!item.id) continue;
-        if ((item.itemData as any)?.productType === 'COMBO') {
-            console.log(`Skipping COMBO item: ${item.itemData?.name}`);
-            continue;
-        }
-        const randomCategory = faker.helpers.arrayElement(categories);
-        if (randomCategory.id) {
-            const updatedItem: CatalogObject = {
-                type: 'ITEM',
-                id: item.id,
-                version: item.version,
-                itemData: {
-                    ...(item.itemData as any),
-                    categoryId: randomCategory.id,
-                    comboTypeDetails: (item.itemData as any)?.productType === 'COMBO' ? (item.itemData as any).comboTypeDetails : undefined
-                }
-            };
-            await catalogClient.batchUpsertItemObjects([{ objects: [updatedItem] }]);
-            console.log(`Assigned category to ${item.itemData?.name}`);
-        }
-        const randomModifierList = faker.helpers.arrayElement(modifierLists);
-        if (randomModifierList.id) {
-            const updatedItem: CatalogObject = {
-                type: 'ITEM',
-                id: item.id,
-                version: item.version,
-                itemData: {
-                    ...(item.itemData as any),
-                    modifierListInfo: [{
-                        modifierListId: randomModifierList.id
-                    }],
-                    comboTypeDetails: (item.itemData as any)?.productType === 'COMBO' ? (item.itemData as any).comboTypeDetails : undefined
-                }
-            };
-            await catalogClient.batchUpsertItemObjects([{ objects: [updatedItem] }]);
-            console.log(`Assigned modifier list to ${item.itemData?.name}`);
-        }
+
+    if (categories.length === 0 || modifierLists.length === 0) {
+        console.log('Warning: No categories or modifier lists available');
+        return;
     }
+
+    while (updatedCount < count && attempts < maxAttempts) {
+        const items = await getRandomItems(count - updatedCount);
+        console.log(`\nAssigning categories and modifiers to ${count - updatedCount} items...`);
+        for (const item of items) {
+            if (!item.id) continue;
+            if ((item.itemData as any)?.productType === 'COMBO') {
+                console.log(`Skipping COMBO item: ${item.itemData?.name}`);
+                continue;
+            }
+            let itemUpdated = false;
+
+            const randomCategory = faker.helpers.arrayElement(categories);
+            if (randomCategory.id) {
+                const updatedItem: CatalogObject = {
+                    type: 'ITEM',
+                    id: item.id,
+                    version: item.version,
+                    itemData: {
+                        ...(item.itemData as any),
+                        categoryId: randomCategory.id,
+                        comboTypeDetails: (item.itemData as any)?.productType === 'COMBO' ? (item.itemData as any).comboTypeDetails : undefined
+                    }
+                };
+                await catalogClient.batchUpsertItemObjects([{ objects: [updatedItem] }]);
+                console.log(`Assigned category to ${item.itemData?.name}`);
+                itemUpdated = true;
+            }
+
+            const randomModifierList = faker.helpers.arrayElement(modifierLists);
+            if (randomModifierList.id) {
+                const updatedItem: CatalogObject = {
+                    type: 'ITEM',
+                    id: item.id,
+                    version: item.version,
+                    itemData: {
+                        ...(item.itemData as any),
+                        modifierListInfo: [{
+                            modifierListId: randomModifierList.id
+                        }],
+                        comboTypeDetails: (item.itemData as any)?.productType === 'COMBO' ? (item.itemData as any).comboTypeDetails : undefined
+                    }
+                };
+                await catalogClient.batchUpsertItemObjects([{ objects: [updatedItem] }]);
+                console.log(`Assigned modifier list to ${item.itemData?.name}`);
+                itemUpdated = true;
+            }
+
+            if (itemUpdated) updatedCount++;
+        }
+        attempts++;
+    }
+    console.log(`\nSuccessfully assigned categories and modifiers to ${updatedCount} items`);
 }
 
 async function runOrderGenerator(minQuantity: number, maxQuantity: number, concurrency: number) {
