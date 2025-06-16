@@ -14,6 +14,7 @@
     "enquirer": "^2.4.1",
     "inquirer": "^8.2.6",
     "p-limit": "^6.2.0",
+    "sharp": "^0.34.2",
     "square": "npm:@goparrot/square@38.0.0-alpha.2024-03-09-patch-1",
     "ts-node": "^10.9.0",
     "typescript": "^5.0.0",

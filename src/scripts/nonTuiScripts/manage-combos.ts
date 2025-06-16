@@ -1,6 +1,6 @@
 import { faker } from '@faker-js/faker';
 import { v4 as uuidv4 } from 'uuid';
-import { SquareManager } from '../module/external/square/catalog/api/SquareCatalogClient';
+import { SquareManager } from '../../module/external/square/catalog/api/SquareCatalogClient';
 import * as dotenv from 'dotenv';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
