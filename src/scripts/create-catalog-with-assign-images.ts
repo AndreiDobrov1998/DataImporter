@@ -193,57 +193,42 @@ async function createCatalog() {
                 continue;
             }
 
-            // Process items for this category
+            let itemIdNum = categoryIndex * (argv['items-per-category'] + argv['items-with-variations']) + 1;
+            
+            // Process regular items (without variations) for this category
             for (let itemIndex = 0; itemIndex < argv['items-per-category']; itemIndex++) {
-                const itemIdNum = categoryIndex * argv['items-per-category'] + itemIndex + 1;
                 const itemId = `Item${itemIdNum}`;
                 
                 // Assign modifier list in round-robin fashion
                 const randomModifierListId = modifierListIdMappings[(itemIdNum - 1) % modifierListIdMappings.length];
                 if (!randomModifierListId) {
                     logWithTimestamp(`Skipping item ${itemId} - no modifier list ID found`, 'warn');
+                    itemIdNum++;
                     continue;
                 }
 
                 try {
-                    // Determine if this item should have variations
-                    const hasVariations = itemIndex < argv['items-with-variations'];
-                    const variations = hasVariations 
-                        ? Array.from({ length: argv['variations-per-item'] }, (_, i) => ({
-                            type: 'ITEM_VARIATION',
-                            id: `#Variation${itemIdNum}_${i + 1}`,
-                            presentAtAllLocations: true,
-                            itemVariationData: {
-                                name: `Variation ${i + 1}`,
-                                pricingType: 'FIXED_PRICING',
-                                priceMoney: {
-                                    amount: BigInt(faker.number.int({ min: 100, max: 1000 })),
-                                    currency: 'USD'
-                                },
-                                imageIds: [imageIds[imageIndex++ % imageIds.length]] // Assign images to variations
-                            }
-                        }))
-                        : [{
-                            type: 'ITEM_VARIATION',
-                            id: `#Variation${itemIdNum}_1`,
-                            presentAtAllLocations: true,
-                            itemVariationData: {
-                                name: 'Regular',
-                                pricingType: 'FIXED_PRICING',
-                                priceMoney: {
-                                    amount: BigInt(faker.number.int({ min: 100, max: 1000 })),
-                                    currency: 'USD'
-                                },
-                                imageIds: [imageIds[imageIndex++ % imageIds.length]]
-                            }
-                        }];
+                    const variations = [{
+                        type: 'ITEM_VARIATION',
+                        id: `#Variation${itemIdNum}_1`,
+                        presentAtAllLocations: true,
+                        itemVariationData: {
+                            name: 'Regular',
+                            pricingType: 'FIXED_PRICING',
+                            priceMoney: {
+                                amount: BigInt(faker.number.int({ min: 100, max: 1000 })),
+                                currency: 'USD'
+                            },
+                            imageIds: [imageIds[imageIndex++ % imageIds.length]]
+                        }
+                    }];
 
                     allItems.push({
                         type: 'ITEM',
                         id: `#Item${itemIdNum}`,
                         presentAtAllLocations: true,
                         itemData: {
-                            name: `Item SQ-${String(itemIdNum).padStart(4, '0')}${hasVariations ? ' (with variations)' : ''}`,
+                            name: `Item SQ-${String(itemIdNum).padStart(4, '0')}`,
                             categories: [{ id: realCategoryId }],
                             modifierListInfo: [{
                                 modifierListId: randomModifierListId,
@@ -256,6 +241,59 @@ async function createCatalog() {
                 } catch (error: any) {
                     logWithTimestamp(`Error processing item ${itemId}: ${error?.message || error}`, 'error');
                 }
+                itemIdNum++;
+            }
+            
+            // Process items with variations for this category
+            for (let itemIndex = 0; itemIndex < argv['items-with-variations']; itemIndex++) {
+                const itemId = `Item${itemIdNum}`;
+                
+                // Assign modifier list in round-robin fashion
+                const randomModifierListId = modifierListIdMappings[(itemIdNum - 1) % modifierListIdMappings.length];
+                if (!randomModifierListId) {
+                    logWithTimestamp(`Skipping item ${itemId} - no modifier list ID found`, 'warn');
+                    itemIdNum++;
+                    continue;
+                }
+
+                try {
+                    // Create variation group name
+                    const varGroupName = `VarGroup-${String(itemIdNum).padStart(2, '0')}`;
+                    
+                    const variations = Array.from({ length: argv['variations-per-item'] }, (_, i) => ({
+                        type: 'ITEM_VARIATION',
+                        id: `#Variation${itemIdNum}_${i + 1}`,
+                        presentAtAllLocations: true,
+                        itemVariationData: {
+                            name: `${varGroupName}-${String(i + 1).padStart(2, '0')}`,
+                            pricingType: 'FIXED_PRICING',
+                            priceMoney: {
+                                amount: BigInt(faker.number.int({ min: 100, max: 1000 })),
+                                currency: 'USD'
+                            },
+                            imageIds: [imageIds[imageIndex++ % imageIds.length]] // Assign images to variations
+                        }
+                    }));
+
+                    allItems.push({
+                        type: 'ITEM',
+                        id: `#Item${itemIdNum}`,
+                        presentAtAllLocations: true,
+                        itemData: {
+                            name: `Item SQ-${String(itemIdNum).padStart(4, '0')} (with variations)`,
+                            categories: [{ id: realCategoryId }],
+                            modifierListInfo: [{
+                                modifierListId: randomModifierListId,
+                                enabled: true
+                            }],
+                            imageIds: [imageIds[imageIndex++ % imageIds.length]], // Assign images to items
+                            variations: variations
+                        }
+                    });
+                } catch (error: any) {
+                    logWithTimestamp(`Error processing item ${itemId}: ${error?.message || error}`, 'error');
+                }
+                itemIdNum++;
             }
         }
 

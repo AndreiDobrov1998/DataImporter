@@ -181,6 +181,8 @@ async function importCatalog() {
 
         // Generate all items
         const itemsPerCategory = argv['items-per-category'];
+        const itemsWithVariationsPerCategory = argv['items-with-variations'];
+        const totalItemsPerCategory = itemsPerCategory + itemsWithVariationsPerCategory;
         const allItems: CatalogObject[] = [];
         let globalItemCounter = 1;
         
@@ -192,50 +194,78 @@ async function importCatalog() {
         for (let categoryIndex = 0; categoryIndex < regularCategoryIds.length; categoryIndex++) {
             const clientCategoryId = regularCategoryIds[categoryIndex];
             const realCategoryId = categoryIdMap[clientCategoryId];
+            
+            // Create regular items (without variations)
             for (let itemIndex = 0; itemIndex < itemsPerCategory; itemIndex++) {
                 // Assign a random modifier list to each item
                 const randomModifierListIndex = Math.floor(Math.random() * modifierGroups.length);
                 const clientModifierListId = `#ModifierList${randomModifierListIndex + 1}`;
                 const realModifierListId = modifierListIdMap[clientModifierListId];
 
-                // Determine if this item should have variations
-                const hasVariations = itemIndex < argv['items-with-variations'];
-                const variations = hasVariations 
-                    ? Array.from({ length: argv['variations-per-item'] }, (_, i) => ({
-                        type: 'ITEM_VARIATION',
-                        id: `#Variation${globalItemCounter}_${i + 1}`,
-                        presentAtAllLocations: true,
-                        itemVariationData: {
-                            itemId: `#Item${globalItemCounter}`,
-                            name: `Variation ${i + 1}`,
-                            pricingType: 'FIXED_PRICING',
-                            priceMoney: {
-                                amount: BigInt(faker.number.int({ min: 100, max: 1000 })),
-                                currency: 'USD'
-                            }
+                const variations = [{
+                    type: 'ITEM_VARIATION',
+                    id: `#Variation${globalItemCounter}_1`,
+                    presentAtAllLocations: true,
+                    itemVariationData: {
+                        itemId: `#Item${globalItemCounter}`,
+                        name: 'Regular',
+                        pricingType: 'FIXED_PRICING',
+                        priceMoney: {
+                            amount: BigInt(faker.number.int({ min: 100, max: 1000 })),
+                            currency: 'USD'
                         }
-                    }))
-                    : [{
-                        type: 'ITEM_VARIATION',
-                        id: `#Variation${globalItemCounter}_1`,
-                        presentAtAllLocations: true,
-                        itemVariationData: {
-                            itemId: `#Item${globalItemCounter}`,
-                            name: 'Regular',
-                            pricingType: 'FIXED_PRICING',
-                            priceMoney: {
-                                amount: BigInt(faker.number.int({ min: 100, max: 1000 })),
-                                currency: 'USD'
-                            }
-                        }
-                    }];
+                    }
+                }];
 
                 allItems.push({
                     type: 'ITEM',
                     id: `#Item${globalItemCounter}`,
                     presentAtAllLocations: true,
                     itemData: {
-                        name: `Item SQ-${String(globalItemCounter).padStart(4, '0')}${hasVariations ? ' (with variations)' : ''}`,
+                        name: `Item SQ-${String(globalItemCounter).padStart(4, '0')}`,
+                        productType: 'REGULAR',
+                        categories: [{ id: realCategoryId }],
+                        modifierListInfo: [{
+                            modifierListId: realModifierListId,
+                            enabled: true
+                        }],
+                        variations: variations
+                    }
+                });
+                globalItemCounter++;
+            }
+            
+            // Create items with variations
+            for (let itemIndex = 0; itemIndex < itemsWithVariationsPerCategory; itemIndex++) {
+                // Assign a random modifier list to each item
+                const randomModifierListIndex = Math.floor(Math.random() * modifierGroups.length);
+                const clientModifierListId = `#ModifierList${randomModifierListIndex + 1}`;
+                const realModifierListId = modifierListIdMap[clientModifierListId];
+
+                // Create variation group name
+                const varGroupName = `VarGroup-${String(globalItemCounter).padStart(2, '0')}`;
+                
+                const variations = Array.from({ length: argv['variations-per-item'] }, (_, i) => ({
+                    type: 'ITEM_VARIATION',
+                    id: `#Variation${globalItemCounter}_${i + 1}`,
+                    presentAtAllLocations: true,
+                    itemVariationData: {
+                        itemId: `#Item${globalItemCounter}`,
+                        name: `${varGroupName}-${String(i + 1).padStart(2, '0')}`,
+                        pricingType: 'FIXED_PRICING',
+                        priceMoney: {
+                            amount: BigInt(faker.number.int({ min: 100, max: 1000 })),
+                            currency: 'USD'
+                        }
+                    }
+                }));
+
+                allItems.push({
+                    type: 'ITEM',
+                    id: `#Item${globalItemCounter}`,
+                    presentAtAllLocations: true,
+                    itemData: {
+                        name: `Item SQ-${String(globalItemCounter).padStart(4, '0')} (with variations)`,
                         productType: 'REGULAR',
                         categories: [{ id: realCategoryId }],
                         modifierListInfo: [{
